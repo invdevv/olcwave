@@ -1,0 +1,9 @@
+{
+  "typeCheckingMode": "standard",
+
+  "reportGeneralTypeIssues": false,
+  "reportOptionalMemberAccess": false,
+  "reportOptionalCall": false,
+
+  "exclude": ["**/.venv", "**/__pycache__"]
+}
