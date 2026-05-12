@@ -1,6 +1,6 @@
 [project]
 name = "olcwave"
-version = "0.1.0"
+version = "0.0.1"
 description = "panel for olcrtc fully Compatible"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"

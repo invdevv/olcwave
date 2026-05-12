@@ -1,0 +1,21 @@
+version: '3.9'
+
+services:
+  olcrtc:
+    build:
+      context: ./olcrtc
+    container_name: olcrtc-container
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: backend-container
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - olcrtc
