@@ -1,23 +1,111 @@
 # OlcWave
 
-### панель для olcrtc управляемая через remnawave users
+[🇷🇺 Русский](README_RU.md)
 
-#### Сейчас не работает
+> Subscription bridge between [RemnaWave](https://github.com/remnawave) and [olcrtc-manager-panel](https://github.com/BigDaddy3334/olcrtc-manager-panel)
 
-####!!! Важно !!!
-Это альфа версия которую я написал за 3 часа без ии
-некоторые вещи тут пока работают костыльно или вообще не работают
-завтра все допишу
+OlcWave acts as a middleware layer: when a user requests their subscription via a `short_uuid`, OlcWave validates their account in RemnaWave, then automatically provisions or retrieves their client in olcrtc-manager and returns a ready-to-use OlcBox subscription.
 
-Usage:
-1. клиент вставляет ссылку с таким же short_uuid как в remnaWave (rw.example.com/suuid -> olcwave.example.com/suuid)
-2. olcWave проверяет есть ли у клиента подписка в rw
-3. если есть то отдает ему sub.md файл с подпиской
+---
 
-Instalation:
+## How it works
+
+```
+User → olcwave.example.com/{short_uuid}
+         │
+         ├─ 1. Validate subscription in RemnaWave
+         │       └─ 404 if not found / expired
+         │
+         ├─ 2. Look up client in olcrtc-manager
+         │       └─ Auto-create if missing (quota synced from RemnaWave expiry)
+         │
+         └─ 3. Return OlcBox subscription text
+```
+
+The `short_uuid` is the same one used in your RemnaWave subscription link, so users just swap the domain — no extra configuration on their end.
+
+---
+
+## Requirements
+
+- Docker & Docker Compose
+- A running [RemnaWave](https://github.com/remnawave) instance
+- A running [olcrtc-manager-panel](https://github.com/BigDaddy3334/olcrtc-manager-panel) instance
+
+---
+
+## Installation
+
 ```bash
 git clone https://github.com/invdevv/olcwave.git --depth=1
 cd olcwave
-docker compose up -
+cp .env.example .env   # fill in your values
+docker compose up -d
 ```
 
+The service listens on port `8000` by default.
+
+---
+
+## Configuration
+
+All settings are loaded from a `.env` file:
+
+| Variable | Description |
+|---|---|
+| `BASE_HOST` | Host to bind the server to |
+| `BASE_PORT` | Port to bind the server to |
+| `RW_API_URL` | RemnaWave API base URL |
+| `RW_API_TOKEN` | RemnaWave API token |
+| `OLCRTC_MANAGER_URL` | olcrtc-manager-panel base URL |
+| `OLCRTC_MANAGER_LOGIN` | olcrtc-manager admin username |
+| `OLCRTC_MANAGER_PASSWORD` | olcrtc-manager admin password |
+| `OLCRTC_CARRIER` | Default carrier for new clients (e.g. `wbstream`) |
+| `OLCRTC_TRANSPORT` | Default transport (e.g. `datachannel`) |
+| `OLCRTC_SERVER_NAME` | Display name for the server location |
+| `OLCRTC_DNS` | DNS server for new clients (e.g. `1.1.1.1:53`) |
+
+---
+
+## Project structure
+
+```
+src/
+├── main.py                  # FastAPI app, single GET /{short_uuid} endpoint
+├── config.py                # Pydantic settings (loaded from .env)
+├── rw.py                    # RemnaWave SDK wrapper — subscription validation
+├── olcmanager.py            # olcrtc-manager logic — create/get client & subscription
+└── olcrtc_manager_api/
+    ├── client.py            # Async HTTP client for olcrtc-manager-panel REST API
+    └── models.py            # Pydantic models (State, ClientState, Quota, OlcboxURI, …)
+```
+
+---
+
+## API
+
+### `GET /{short_uuid}`
+
+Returns an OlcBox subscription for the given user.
+
+| Status | Meaning |
+|---|---|
+| `200` | Subscription text returned |
+| `404` | User not found in RemnaWave |
+
+---
+
+## Stack
+
+- **Python 3.13**
+- **FastAPI** — HTTP framework
+- **httpx** — async HTTP client
+- **Pydantic v2** — data validation & settings
+- **remnawave** — RemnaWave Python SDK
+- **uv** — package management
+
+---
+
+## License
+
+[GPL-3.0](LICENSE)
