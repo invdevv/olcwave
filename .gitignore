@@ -1,0 +1,7 @@
+.venv
+.env
+.vscode
+__pycache__
+temp.txt
+.utils
+.ruff_cache
