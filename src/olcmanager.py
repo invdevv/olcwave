@@ -20,7 +20,7 @@ async def getOlcManagerApi():
 async def addClient(client_id: str, sub: SubscriptionInfoResponseDto):
     async with getOlcManagerApi() as api:
         quota = Quota(  # pyright: ignore[reportCallIssue]
-            expires_at = sub.user.expires_at.strftime("%Y-%m-%d'")
+            expires_at = sub.user.expires_at.strftime("%Y-%m-%d")
         )
 
         client  = AddClientRequest(

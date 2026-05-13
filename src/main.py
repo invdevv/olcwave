@@ -4,7 +4,7 @@ import uvicorn
 from rw import isUserValid
 import olcmanager
 
-app = FastAPI()
+app = FastAPI(docs_url="")
 
 @app.get("/{short_uuid}")
 async def getSub(short_uuid: str):
@@ -17,7 +17,7 @@ async def getSub(short_uuid: str):
     if not client:
         client = await olcmanager.addClient(short_uuid, sub)
     
-    subscription = olcmanager.getSubscription(client.client_id)
+    subscription = await olcmanager.getSubscription(client.client_id)
 
     return subscription
 
