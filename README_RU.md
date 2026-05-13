@@ -36,10 +36,17 @@ OlcWave работает как промежуточный слой: когда 
 
 ## Установка
 
+Сначала установите и настройте [OlcrtcManagerPanel](https://github.com/BigDaddy3334/olcrtc-manager-panel)
+```bash
+curl -fsSL https://raw.githubusercontent.com/BigDaddy3334/olcrtc-manager-panel/main/scripts/install.sh | sudo bash
+```
+
+Затем установите и настройте olcWave
 ```bash
 git clone https://github.com/invdevv/olcwave.git --depth=1
 cd olcwave
 cp .env.example .env   # заполните своими значениями
+nano .env
 docker compose up -d
 ```
 

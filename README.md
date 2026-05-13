@@ -36,10 +36,17 @@ The `short_uuid` is the same one used in your RemnaWave subscription link, so us
 
 ## Installation
 
+First install and configure [OlcrtcManagerPanel](https://github.com/BigDaddy3334/olcrtc-manager-panel)
+```bash
+curl -fsSL https://raw.githubusercontent.com/BigDaddy3334/olcrtc-manager-panel/main/scripts/install.sh | sudo bash
+```
+
+Then install and configure OlcWave
 ```bash
 git clone https://github.com/invdevv/olcwave.git --depth=1
 cd olcwave
 cp .env.example .env   # fill in your values
+nano .env
 docker compose up -d
 ```
 
