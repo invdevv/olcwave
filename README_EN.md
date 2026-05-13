@@ -31,6 +31,7 @@ The `short_uuid` is the same one used in your RemnaWave subscription link, so us
 - Docker & Docker Compose
 - A running [RemnaWave](https://github.com/remnawave) instance
 - A running [olcrtc-manager-panel](https://github.com/BigDaddy3334/olcrtc-manager-panel) instance
+- Caddy/Nginx
 
 ---
 
@@ -53,6 +54,48 @@ docker compose up -d
 The service listens on port `8000` by default.
 
 ---
+
+## Настройка Reverse proxy:
+
+Caddy:
+```Caddyfile
+olcwave.example.com {
+    reverse_proxy 127.0.0.1:8000
+}
+olcmanager.example.com {
+    reverse_proxy 127.0.0.1:8888
+}
+```
+
+Nginx:
+```server {
+    listen 80;
+    server_name olcwave.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    server_name olcmanager.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8888;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
 ## Configuration
 

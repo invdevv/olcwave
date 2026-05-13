@@ -31,6 +31,7 @@ OlcWave работает как промежуточный слой: когда 
 - Docker и Docker Compose
 - Работающий инстанс [RemnaWave](https://github.com/remnawave)
 - Работающий инстанс [olcrtc-manager-panel](https://github.com/BigDaddy3334/olcrtc-manager-panel)
+- Caddy/Nginx
 
 ---
 
@@ -51,6 +52,50 @@ docker compose up -d
 ```
 
 Сервис запускается на порту `8000` по умолчанию.
+
+---
+
+## Настройка Reverse proxy:
+
+Caddy:
+```Caddyfile
+olcwave.example.com {
+    reverse_proxy 127.0.0.1:8000
+}
+olcmanager.example.com {
+    reverse_proxy 127.0.0.1:8888
+}
+```
+
+Nginx:
+```server {
+    listen 80;
+    server_name olc.exanm.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    server_name olc1.exanm.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8888;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
 ---
 
