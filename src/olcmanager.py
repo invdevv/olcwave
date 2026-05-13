@@ -42,7 +42,7 @@ async def getClient(client_id: str):
         clients = await api.list_clients()
 
         client = [client for client in clients if client.client_id == client_id]
-
+        
         return client[0] if len(client) >= 1 else None
 
 
