@@ -1,6 +1,6 @@
 # OlcWave
 
-[🇷🇺 English](README.md)
+[🇺🇸 English](README.md)
 
 > Мост между [RemnaWave](https://github.com/remnawave) и [olcrtc-manager-panel](https://github.com/BigDaddy3334/olcrtc-manager-panel)
 
