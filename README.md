@@ -68,7 +68,8 @@ olcmanager.example.com {
 ```
 
 Nginx:
-```server {
+```
+server {
     listen 80;
     server_name olc.exanm.com;
 
