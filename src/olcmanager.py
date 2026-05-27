@@ -2,6 +2,7 @@ from remnawave.models import SubscriptionInfoResponseDto
 
 from olcrtc_manager_api.client import OlcrtcManager
 from olcrtc_manager_api.models import AddClientRequest, Quota
+from olcrtc_manager_api.utils import getRandomRoomId, getRandomKey
 
 from config import settings
 
@@ -11,9 +12,12 @@ from contextlib import asynccontextmanager
 async def getOlcManagerApi():
     async with OlcrtcManager(
         settings.OLCRTC_MANAGER_URL,
-        settings.OLCRTC_MANAGER_LOGIN,
-        settings.OLCRTC_MANAGER_PASSWORD
     ) as api:
+        await api.login(
+            settings.OLCRTC_MANAGER_LOGIN,
+            settings.OLCRTC_MANAGER_PASSWORD
+        )
+        
         yield api
 
 
@@ -23,23 +27,26 @@ async def addClient(client_id: str, sub: SubscriptionInfoResponseDto):
             expires_at = sub.user.expires_at.strftime("%Y-%m-%d")
         )
 
-        client  = AddClientRequest(
+        client  = AddClientRequest(  # pyright: ignore[reportCallIssue]
             client_id = client_id,
+            quota = quota,
             carrier = settings.OLCRTC_CARRIER,
+            room_id = settings.OLCRTC_JITSI_URL + f"/{getRandomRoomId()}",
             transport = settings.OLCRTC_TRANSPORT,
-            name = settings.OLCRTC_SERVER_NAME,
+            key = getRandomKey(),
             dns = settings.OLCRTC_DNS,
-            quota = quota
+            name = settings.OLCRTC_SERVER_NAME
         )
 
-        resp = await api.create_client(client)
+        resp = await api.add_client(client)
 
         return resp
 
 
 async def getClient(client_id: str):
     async with getOlcManagerApi() as api:
-        clients = await api.list_clients()
+        state = await api.get_state()
+        clients = state.clients
 
         client = [client for client in clients if client.client_id == client_id]
         

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     OLCRTC_TRANSPORT: str
     OLCRTC_SERVER_NAME: str
     OLCRTC_DNS: str
+    OLCRTC_JITSI_URL: str
 
     model_config = SettingsConfigDict(env_file=".env")
 

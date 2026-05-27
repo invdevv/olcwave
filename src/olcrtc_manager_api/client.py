@@ -1,151 +1,103 @@
 """
-OlcrtcManager — async Python client for the olcrtc-manager-panel REST API.
+Async API client for olcrtc-manager.
 
-Source of truth: cmd/olcrtc-manager/main.go
-https://github.com/BigDaddy3334/olcrtc-manager-panel
+Usage example::
 
-Stack: Python 3.13 · httpx · pydantic v2
-
-Quick start:
-    async with OlcrtcManager("http://127.0.0.1:8888", "admin", "secret") as mgr:
+    async with OlcrtcManager("http://127.0.0.1:8080") as mgr:
+        login = await mgr.login("admin", "secret")
         state = await mgr.get_state()
-        for client in state.clients:
-            print(client.client_id, client.quota.used_gb, "GB used")
+        print(state.clients)
 """
-
 from __future__ import annotations
 
-from typing import Any
+from typing import Optional
 
 import httpx
 
 from .models import (
     AddClientRequest,
+    AddClientResponse,
     AddLocationRequest,
     AuditResponse,
     AuthMeResponse,
     ChangePasswordRequest,
+    ChangePasswordResponse,
     ClientActionRequest,
-    ClientState,
-    CreateClientResponse,
     LocationActionRequest,
     LogsResponse,
-    Metrics,
-    OlcboxURI,
     LoginRequest,
+    LoginResponse,
+    Metrics,
     SetupRequest,
+    SetupResponse,
     State,
-    SubscriptionMeta,
     UpdateClientRequest,
-    QuotaStatus,
 )
 
 
 class OlcrtcManagerError(Exception):
-    """Raised for non-2xx responses from the manager API."""
+    """Raised when the API returns a non-2xx status code."""
 
     def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(f"HTTP {status_code}: {detail}")
         self.status_code = status_code
         self.detail = detail
+        super().__init__(f"HTTP {status_code}: {detail}")
 
 
 class OlcrtcManager:
     """
-    Async client for the olcrtc-manager-panel admin API.
+    Async client for the olcrtc-manager HTTP API.
 
-    All endpoints discovered from main.go:
-
-    Auth
-    ────
-    GET  /api/auth/me                       → me()
-    POST /api/auth/login                    → login()
-    POST /api/auth/logout                   → logout()
-    POST /api/auth/setup                    → setup()          [first-run]
-    POST /api/auth/password                 → change_password()
-
-    State & monitoring
-    ──────────────────
-    GET  /api/state                         → get_state()      [all clients + runtime]
-    GET  /api/metrics                       → get_metrics()
-    GET  /api/audit                         → get_audit()
-    GET  /api/logs/{cid}/{room}/{transport} → get_logs()
-
-    Client CRUD
-    ───────────
-    POST /api/clients                       → create_client()
-    PUT  /api/clients/{id}                  → update_client()
-    DELETE /api/clients/{id}               → delete_client()
-    POST /api/clients/{id}/locations        → add_location()
-    DELETE /api/clients/{id}/locations/{r} → delete_location()
-
-    Actions
-    ───────
-    POST /api/actions/restart               → restart_location()
-    POST /api/actions/regenerate-room       → regenerate_room()
-    POST /api/actions/rotate-key            → rotate_key()
-    POST /api/reload                        → reload()         [auth required]
-    POST /-/reload                          → reload_loopback() [loopback only, no auth]
-
-    Subscriptions (no auth)
-    ───────────────────────
-    GET  /{client_id}/                      → get_subscription()
-                                            → get_subscription_parsed()
+    Parameters
+    ----------
+    base_url:
+        Root URL of the running manager, e.g. ``"http://127.0.0.1:8080"``.
+    username / password:
+        Optional Basic-Auth credentials.  When supplied, every request uses
+        HTTP Basic Auth in addition to any session cookie that was obtained
+        via :meth:`login`.
+    timeout:
+        httpx timeout in seconds (default 30).
     """
 
     def __init__(
         self,
         base_url: str,
-        username: str | None = None,
-        password: str | None = None,
         *,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        self._username = username
-        self._password = password
+        self._auth = (username, password) if username and password else None
         self._timeout = timeout
-        self._client: httpx.AsyncClient | None = None
+        self._client: Optional[httpx.AsyncClient] = None
 
-    # ------------------------------------------------------------------
-    # Context-manager
-    # ------------------------------------------------------------------
+    # ── context-manager support ───────────────────────────────────────────
 
     async def __aenter__(self) -> "OlcrtcManager":
-        await self._open()
+        await self._ensure_client()
         return self
 
-    async def __aexit__(self, *_: Any) -> None:
+    async def __aexit__(self, *_: object) -> None:
         await self.close()
 
-    async def _open(self) -> None:
-        auth = (
-            httpx.BasicAuth(self._username, self._password)
-            if self._username and self._password
-            else None
-        )
-        self._client = httpx.AsyncClient(
-            base_url=self._base_url,
-            auth=auth,
-            timeout=self._timeout,
-            follow_redirects=True,
-            headers={"Accept": "application/json"},
-        )
-
     async def close(self) -> None:
+        """Close the underlying httpx client."""
         if self._client is not None:
             await self._client.aclose()
             self._client = None
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # ── internal helpers ──────────────────────────────────────────────────
 
-    @property
-    def _http(self) -> httpx.AsyncClient:
+    async def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None:
-            raise RuntimeError(
-                "Client not open. Use 'async with OlcrtcManager(...)' or call _open()."
+            self._client = httpx.AsyncClient(
+                base_url=self._base_url,
+                timeout=self._timeout,
+                # Persist cookies so the session cookie from login() is reused
+                cookies=httpx.Cookies(),
+                follow_redirects=True,
             )
         return self._client
 
@@ -154,326 +106,182 @@ class OlcrtcManager:
         method: str,
         path: str,
         *,
-        json: Any = None,
-        params: dict[str, Any] | None = None,
+        json: object = None,
+        params: Optional[dict] = None,
     ) -> httpx.Response:
-        resp = await self._http.request(method, path, json=json, params=params)
-        if not resp.is_success:
-            try:
-                detail = resp.json().get("error") or resp.text
-            except Exception:
-                detail = resp.text
-            raise OlcrtcManagerError(resp.status_code, detail)
-        return resp
+        client = await self._ensure_client()
+        kwargs: dict = {"method": method, "url": path}
+        if json is not None:
+            kwargs["json"] = json
+        if params:
+            kwargs["params"] = params
+        if self._auth:
+            kwargs["auth"] = self._auth
+        response = await client.request(**kwargs)
+        if not response.is_success:
+            raise OlcrtcManagerError(response.status_code, response.text.strip())
+        return response
 
-    # ------------------------------------------------------------------
-    # Auth
-    # ------------------------------------------------------------------
+    async def _get(self, path: str, **kw: object) -> httpx.Response:
+        return await self._request("GET", path, **kw)  # pyright: ignore[reportArgumentType]
 
-    async def me(self) -> AuthMeResponse:
-        """GET /api/auth/me — check current session / setup status."""
-        r = await self._request("GET", "/api/auth/me")
+    async def _post(self, path: str, **kw: object) -> httpx.Response:
+        return await self._request("POST", path, **kw)  # pyright: ignore[reportArgumentType]
+
+    async def _put(self, path: str, **kw: object) -> httpx.Response:
+        return await self._request("PUT", path, **kw)  # pyright: ignore[reportArgumentType]
+
+    async def _delete(self, path: str, **kw: object) -> httpx.Response:
+        return await self._request("DELETE", path, **kw)  # pyright: ignore[reportArgumentType]
+
+    # ── Auth ──────────────────────────────────────────────────────────────
+
+    async def auth_me(self) -> AuthMeResponse:
+        """GET /api/auth/me — return current authentication status."""
+        r = await self._get("/api/auth/me")
         return AuthMeResponse.model_validate(r.json())
 
-    async def login(self, user: str, password: str) -> AuthMeResponse:
+    async def login(self, user: str, password: str) -> LoginResponse:
         """
-        POST /api/auth/login — create a session cookie.
+        POST /api/auth/login — authenticate and store the session cookie.
 
-        Note: the body field is 'user', NOT 'username'.
+        After a successful login the cookie is kept inside the httpx client
+        and sent automatically with subsequent requests.
         """
         body = LoginRequest(user=user, password=password)
-        r = await self._request("POST", "/api/auth/login", json=body.model_dump())
-        return AuthMeResponse.model_validate(r.json())
+        r = await self._post("/api/auth/login", json=body.model_dump())
+        return LoginResponse.model_validate(r.json())
+
+    async def setup(self, password: str, user: str = "") -> SetupResponse:
+        """POST /api/auth/setup — create initial admin credentials."""
+        body = SetupRequest(user=user, password=password)
+        r = await self._post("/api/auth/setup", json=body.model_dump(exclude_none=True))
+        return SetupResponse.model_validate(r.json())
 
     async def logout(self) -> None:
         """POST /api/auth/logout — invalidate the current session."""
-        await self._request("POST", "/api/auth/logout")
+        await self._post("/api/auth/logout")
 
-    async def setup(self, password: str, user: str = "admin") -> AuthMeResponse:
-        """
-        POST /api/auth/setup — first-run only.
-
-        Fails with 409 if a password has already been configured.
-        Password must be at least 8 characters.
-        """
-        body = SetupRequest(user=user, password=password)
-        r = await self._request("POST", "/api/auth/setup", json=body.model_dump())
-        return AuthMeResponse.model_validate(r.json())
-
-    async def change_password(self, current_password: str, new_password: str) -> None:
-        """POST /api/auth/password — change the admin password (requires auth)."""
+    async def change_password(
+        self, current_password: str, new_password: str
+    ) -> ChangePasswordResponse:
+        """POST /api/auth/password — change the admin password."""
         body = ChangePasswordRequest(
             current_password=current_password,
             new_password=new_password,
         )
-        await self._request("POST", "/api/auth/password", json=body.model_dump())
+        r = await self._post("/api/auth/password", json=body.model_dump())
+        return ChangePasswordResponse.model_validate(r.json())
 
-    # ------------------------------------------------------------------
-    # State & monitoring
-    # ------------------------------------------------------------------
+    # ── State & metrics ───────────────────────────────────────────────────
 
     async def get_state(self) -> State:
-        """
-        GET /api/state — returns the full manager state.
-
-        This is the primary way to list all clients and their runtime status.
-        There is no separate GET /api/clients endpoint.
-        """
-        r = await self._request("GET", "/api/state")
+        """GET /api/state — return the full supervisor state."""
+        r = await self._get("/api/state")
         return State.model_validate(r.json())
 
     async def get_metrics(self) -> Metrics:
-        """GET /api/metrics — Go runtime, memory, and per-process metrics."""
-        r = await self._request("GET", "/api/metrics")
+        """GET /api/metrics — return runtime/memory/process metrics."""
+        r = await self._get("/api/metrics")
         return Metrics.model_validate(r.json())
 
     async def get_audit(self) -> AuditResponse:
-        """GET /api/audit — last 100 audit log entries."""
-        r = await self._request("GET", "/api/audit")
+        """GET /api/audit — return the last 100 audit log events."""
+        r = await self._get("/api/audit")
         return AuditResponse.model_validate(r.json())
 
     async def get_logs(
         self, client_id: str, room_id: str, transport: str
     ) -> LogsResponse:
-        """
-        GET /api/logs/{client_id}/{room_id}/{transport}
-
-        All three path segments are required.  Obtain room_id and transport
-        from LocationState (via get_state()) for the desired location.
-        """
-        r = await self._request(
-            "GET", f"/api/logs/{client_id}/{room_id}/{transport}"
-        )
+        """GET /api/logs/{client_id}/{room_id}/{transport} — fetch process logs."""
+        path = f"/api/logs/{client_id}/{room_id}/{transport}"
+        r = await self._get(path)
         return LogsResponse.model_validate(r.json())
 
-    # ------------------------------------------------------------------
-    # Client CRUD
-    # ------------------------------------------------------------------
+    # ── Config reload ─────────────────────────────────────────────────────
 
-    async def create_client(self, request: AddClientRequest) -> CreateClientResponse:
+    async def reload(self) -> None:
+        """POST /api/reload — reload the config file on the server."""
+        await self._post("/api/reload")
+
+    # ── Clients ───────────────────────────────────────────────────────────
+
+    async def add_client(self, request: AddClientRequest) -> AddClientResponse:
         """
         POST /api/clients — create a new client.
 
-        The server auto-generates a room ID (olcrtc -mode gen) and a 32-byte key.
-        Returns 201 Created with {"client_id": "..."}.
-
-        Key points:
-        - 'transport' is a plain string ("datachannel"), NOT a JSON object.
-        - Use 'payload' for transport-specific options (e.g. {"vp8-fps": "60"}).
-        - Set 'from_client' to clone locations from an existing client instead
-          of specifying carrier/transport/dns manually.
+        Pass an :class:`AddClientRequest` with at minimum ``client_id`` and
+        either ``carrier``/``transport``/``dns`` or ``from_client``.
         """
-        r = await self._request(
-            "POST",
+        r = await self._post(
             "/api/clients",
-            json=request.model_dump(exclude_none=True),
+            json=request.model_dump(exclude_none=True, by_alias=True),
         )
-        return CreateClientResponse.model_validate(r.json())
+        return AddClientResponse.model_validate(r.json())
 
     async def update_client(
         self, client_id: str, request: UpdateClientRequest
     ) -> None:
-        """
-        PUT /api/clients/{client_id} — update carrier, transport, dns, quota, name.
-
-        Updates the first location only.  carrier, transport, and dns are all
-        required.  Returns 204 No Content on success.
-        """
-        await self._request(
-            "PUT",
+        """PUT /api/clients/{client_id} — update an existing client."""
+        await self._put(
             f"/api/clients/{client_id}",
             json=request.model_dump(exclude_none=True),
         )
 
     async def delete_client(self, client_id: str) -> None:
-        """
-        DELETE /api/clients/{client_id}
+        """DELETE /api/clients/{client_id} — remove a client."""
+        await self._delete(f"/api/clients/{client_id}")
 
-        Stops all location processes and removes the client from config.
-        Cannot delete the last remaining client.
-        """
-        await self._request("DELETE", f"/api/clients/{client_id}")
+    # ── Locations ─────────────────────────────────────────────────────────
 
     async def add_location(
         self, client_id: str, request: AddLocationRequest
     ) -> None:
-        """
-        POST /api/clients/{client_id}/locations
-
-        Adds a new location (with a freshly generated room ID + key) to an
-        existing client.  Returns 201 No Content on success.
-        """
-        await self._request(
-            "POST",
+        """POST /api/clients/{client_id}/locations — add a location to a client."""
+        await self._post(
             f"/api/clients/{client_id}/locations",
             json=request.model_dump(exclude_none=True),
         )
 
     async def delete_location(self, client_id: str, room_id: str) -> None:
-        """
-        DELETE /api/clients/{client_id}/locations/{room_id}
+        """DELETE /api/clients/{client_id}/locations/{room_id} — remove a location."""
+        await self._delete(f"/api/clients/{client_id}/locations/{room_id}")
 
-        Removes one location from a client by its room ID.
-        Cannot delete the last location.
-        """
-        await self._request("DELETE", f"/api/clients/{client_id}/locations/{room_id}")
+    # ── Actions ───────────────────────────────────────────────────────────
 
-    # ------------------------------------------------------------------
-    # Actions
-    # ------------------------------------------------------------------
-
-    async def restart_location(
+    async def restart(
         self, client_id: str, room_id: str, transport: str
     ) -> None:
-        """
-        POST /api/actions/restart
-
-        Restarts a specific location process identified by the three-part key
-        (client_id, room_id, transport).  Obtain these from LocationState via
-        get_state().
-        """
+        """POST /api/actions/restart — restart a specific location process."""
         body = LocationActionRequest(
-            client_id=client_id, room_id=room_id, transport=transport
+            client_id=client_id,
+            room_id=room_id,
+            transport=transport,
         )
-        await self._request(
-            "POST", "/api/actions/restart", json=body.model_dump()
-        )
+        await self._post("/api/actions/restart", json=body.model_dump())
 
     async def regenerate_room(self, client_id: str) -> None:
         """
-        POST /api/actions/regenerate-room
-
-        Runs 'olcrtc -mode gen' to get a new room ID for every location of
-        the client, saves config, and triggers a reload.
+        POST /api/actions/regenerate-room — generate a new room ID for
+        all locations of a client.
         """
         body = ClientActionRequest(client_id=client_id)
-        await self._request(
-            "POST", "/api/actions/regenerate-room", json=body.model_dump()
-        )
+        await self._post("/api/actions/regenerate-room", json=body.model_dump())
 
     async def rotate_key(self, client_id: str) -> None:
         """
-        POST /api/actions/rotate-key
-
-        Generates a new random 32-byte hex key for every location of the
-        client, saves config, and triggers a reload.
+        POST /api/actions/rotate-key — rotate the encryption key for all
+        locations of a client.
         """
         body = ClientActionRequest(client_id=client_id)
-        await self._request(
-            "POST", "/api/actions/rotate-key", json=body.model_dump()
-        )
+        await self._post("/api/actions/rotate-key", json=body.model_dump())
 
-    async def reload(self) -> None:
-        """
-        POST /api/reload (auth required)
-
-        Hot-reloads config: restarts only clients whose config changed,
-        leaves unchanged processes running.  Returns 204 No Content.
-        """
-        await self._request("POST", "/api/reload")
-
-    async def reload_loopback(self) -> None:
-        """
-        POST /-/reload (no auth, loopback only)
-
-        Same as reload() but requires the request to originate from 127.0.0.1.
-        Useful when calling from the same host without credentials.
-        """
-        await self._request("POST", "/-/reload")
-
-    # ------------------------------------------------------------------
-    # Subscriptions (no auth required)
-    # ------------------------------------------------------------------
+    # ── Subscription ──────────────────────────────────────────────────────
 
     async def get_subscription(self, client_id: str) -> str:
         """
-        GET /{client_id}/ — raw plain-text OlcBox subscription.
-
-        No authentication required.  Returns the subscription text that
-        clients import, including quota comment lines and OlcBox URI lines.
+        GET /{client_id} — fetch the plain-text subscription config for a
+        client (no auth required).
         """
-        resp = await self._http.get(
-            f"/{client_id}/", headers={"Accept": "text/plain"}
-        )
-        if not resp.is_success:
-            raise OlcrtcManagerError(resp.status_code, resp.text)
-        return resp.text
-
-    async def get_subscription_parsed(
-        self, client_id: str
-    ) -> tuple[SubscriptionMeta, list[OlcboxURI]]:
-        """
-        Fetches and parses the plain-text subscription.
-
-        Returns (meta, uris) where meta holds the parsed #quota-* comment
-        values and uris is a list of parsed OlcboxURI objects.
-
-        Example subscription::
-
-            #quota-speed-mbps: 10
-            #quota-traffic-gb: 100
-            #quota-used-gb: 5
-            #quota-used-bytes: 5368709120
-            #quota-expires-at: 2026-12-31
-            #quota-status: active
-            olcrtc://wbstream?datachannel@room-01#key%alice$Alice
-        """
-        raw = await self.get_subscription(client_id)
-        meta = SubscriptionMeta()
-        uris: list[OlcboxURI] = []
-
-        for line in raw.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("#quota-speed-mbps:"):
-                meta.speed_mbps = int(line.split(":", 1)[1].strip())
-            elif line.startswith("#quota-traffic-gb:"):
-                meta.traffic_gb = int(line.split(":", 1)[1].strip())
-            elif line.startswith("#quota-used-gb:"):
-                meta.used_gb = float(line.split(":", 1)[1].strip())
-            elif line.startswith("#quota-used-bytes:"):
-                meta.used_bytes = int(line.split(":", 1)[1].strip())
-            elif line.startswith("#quota-expires-at:"):
-                meta.expires_at = line.split(":", 1)[1].strip()
-            elif line.startswith("#quota-status:"):
-                meta.status = QuotaStatus(line.split(":", 1)[1].strip())
-            elif line.startswith("olcrtc://"):
-                uris.append(OlcboxURI.from_raw(line))
-
-        return meta, uris
-
-    # ------------------------------------------------------------------
-    # Convenience helpers
-    # ------------------------------------------------------------------
-
-    async def is_first_run(self) -> bool:
-        """Return True if the panel has no password configured yet."""
-        info = await self.me()
-        return info.setup_required
-
-    async def list_clients(self) -> list[ClientState]:
-        """
-        Shortcut: returns state.clients (list[ClientState]).
-
-        The server has no GET /api/clients endpoint — clients are fetched
-        via GET /api/state and this helper unwraps that for convenience.
-        """
-        state = await self.get_state()
-        return state.clients
-
-    async def get_uri(self, client_id: str, location_index: int = 0) -> OlcboxURI | None:
-        """
-        Return the parsed OlcBox URI for one location of a client.
-
-        Reads the URI from the state (LocationState.uri) and parses it.
-        Returns None if the client or location does not exist.
-        """
-        state = await self.get_state()
-        for client in state.clients:
-            if client.client_id == client_id:
-                if location_index < len(client.locations):
-                    raw_uri = client.locations[location_index].uri
-                    if raw_uri:
-                        return OlcboxURI.from_raw(raw_uri)
-        return None
+        r = await self._get(f"/{client_id}")
+        return r.text
