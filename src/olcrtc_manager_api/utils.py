@@ -25,7 +25,7 @@ wordlist = [
 import random, string
 
 def getRandomRoomId():
-    rng = [wordlist[random.randint(0, len(wordlist) - 1)] for _ in range(4)]
+    rng = [wordlist[random.randint(0, len(wordlist) - 1)] for _ in range(5)]
 
     return "".join(rng)
 
