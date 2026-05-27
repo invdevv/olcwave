@@ -55,6 +55,6 @@ async def getClient(client_id: str):
 
 async def getSubscription(client_id: str):
     async with getOlcManagerApi() as api:
-        sub = await api.get_subscription(client_id)
+        sub = await api.get_subscription(settings.OLCRTC_SUB_PATH, client_id)
 
         return sub

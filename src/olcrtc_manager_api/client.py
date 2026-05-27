@@ -278,10 +278,10 @@ class OlcrtcManager:
 
     # ── Subscription ──────────────────────────────────────────────────────
 
-    async def get_subscription(self, client_id: str) -> str:
+    async def get_subscription(self, subscriptionPath: str, client_id: str) -> str:
         """
         GET /{client_id} — fetch the plain-text subscription config for a
         client (no auth required).
         """
-        r = await self._get(f"/{client_id}")
+        r = await self._get(f"/{subscriptionPath}/{client_id}")
         return r.text

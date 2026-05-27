@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     OLCRTC_MANAGER_LOGIN: str
     OLCRTC_MANAGER_PASSWORD: str
 
+    OLCRTC_SUB_PATH: str
     OLCRTC_CARRIER: str
     OLCRTC_TRANSPORT: str
     OLCRTC_SERVER_NAME: str
