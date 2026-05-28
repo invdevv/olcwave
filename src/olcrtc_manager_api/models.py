@@ -35,7 +35,7 @@ class Location(BaseModel):
     client_id: str = Field("", alias="client_id")
     endpoint: Endpoint = Field(default_factory=Endpoint)  # pyright: ignore[reportArgumentType]
     carrier: str = ""
-    transport: Transport = Field(default_factory=Transport)
+    transport: str
     link: str = ""
     data: str = ""
     dns: str = ""
