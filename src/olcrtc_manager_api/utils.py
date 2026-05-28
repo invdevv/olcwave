@@ -24,10 +24,13 @@ wordlist = [
 
 import random, string
 
-def getRandomRoomId():
-    rng = [wordlist[random.randint(0, len(wordlist) - 1)] for _ in range(5)]
+from config import settings
 
-    return "".join(rng)
+def getRoomId():
+    if settings.OLCRTC_CARRIER == "jitsi":
+        return settings.OLCRTC_JITSI_URL + "/" + "".join([wordlist[random.randint(0, len(wordlist) - 1)] for _ in range(5)])  # pyright: ignore[reportOptionalOperand]
+    else:
+        return settings.OLCRTC_ROOM_ID
 
 
 def getRandomKey():

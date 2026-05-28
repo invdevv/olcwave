@@ -2,7 +2,7 @@ from remnawave.models import SubscriptionInfoResponseDto
 
 from olcrtc_manager_api.client import OlcrtcManager
 from olcrtc_manager_api.models import AddClientRequest, Endpoint, Location, Quota, Transport
-from olcrtc_manager_api.utils import getRandomRoomId, getRandomKey
+from olcrtc_manager_api.utils import getRoomId, getRandomKey
 
 from config import settings
 
@@ -29,7 +29,7 @@ async def addClient(client_id: str, sub: SubscriptionInfoResponseDto):
 
         location = Location(
             name = settings.OLCRTC_SERVER_NAME,
-            room_id = settings.OLCRTC_JITSI_URL + f"/{getRandomRoomId()}",
+            room_id = getRoomId(),  # pyright: ignore[reportOptionalOperand, reportArgumentType]
             key = getRandomKey(),
             carrier = settings.OLCRTC_CARRIER,
             transport = settings.OLCRTC_TRANSPORT,  # pyright: ignore[reportArgumentType]

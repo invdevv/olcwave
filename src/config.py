@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     OLCRTC_TRANSPORT: str
     OLCRTC_SERVER_NAME: str
     OLCRTC_DNS: str
-    OLCRTC_JITSI_URL: str
+    OLCRTC_ROOM_ID: str | None
+    OLCRTC_JITSI_URL: str | None
 
     model_config = SettingsConfigDict(env_file=".env")
 
