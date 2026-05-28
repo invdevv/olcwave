@@ -1,7 +1,7 @@
 from remnawave.models import SubscriptionInfoResponseDto
 
 from olcrtc_manager_api.client import OlcrtcManager
-from olcrtc_manager_api.models import AddClientRequest, Endpoint, Location, Quota, Transport
+from olcrtc_manager_api.models import AddClientRequest, Location, Quota
 from olcrtc_manager_api.utils import getRoomId, getRandomKey
 
 from config import settings

@@ -22,7 +22,8 @@ wordlist = [
 "Local", "Logic", "Maintain", "Major", "Make", "Manage", "Market", "Measure", "Method", "Model"
 ]
 
-import random, string
+import random
+import string
 
 from config import settings
 

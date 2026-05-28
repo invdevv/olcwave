@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from olcrtc_manager_api.models import Transport
 
 class Settings(BaseSettings):
     BASE_HOST: str
