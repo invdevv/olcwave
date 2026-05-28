@@ -32,7 +32,7 @@ class Transport(BaseModel):
 
 class Location(BaseModel):
     name: str = ""
-    client_id: str = Field("", alias="client-id")
+    client_id: str = Field("", alias="client_id")
     endpoint: Endpoint = Field(default_factory=Endpoint)  # pyright: ignore[reportArgumentType]
     carrier: str = ""
     transport: Transport = Field(default_factory=Transport)

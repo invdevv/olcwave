@@ -1,7 +1,7 @@
 from remnawave.models import SubscriptionInfoResponseDto
 
 from olcrtc_manager_api.client import OlcrtcManager
-from olcrtc_manager_api.models import AddClientRequest, Quota
+from olcrtc_manager_api.models import AddClientRequest, Endpoint, Location, Quota
 from olcrtc_manager_api.utils import getRandomRoomId, getRandomKey
 
 from config import settings
@@ -27,15 +27,21 @@ async def addClient(client_id: str, sub: SubscriptionInfoResponseDto):
             expires_at = sub.user.expires_at.strftime("%Y-%m-%d")
         )
 
+        location = Location(
+            name = settings.OLCRTC_SERVER_NAME,
+            client_id = client_id,
+            endpoint=Endpoint(room_id=settings.OLCRTC_JITSI_URL + f"/{getRandomRoomId()}", key = getRandomKey()),
+            carrier = settings.OLCRTC_CARRIER,
+            transport = settings.OLCRTC_TRANSPORT,  # pyright: ignore[reportArgumentType]
+            link = "direct",
+            data = "data",
+            dns = settings.OLCRTC_DNS,
+        )
+
         client  = AddClientRequest(  # pyright: ignore[reportCallIssue]
             client_id = client_id,
             quota = quota,
-            carrier = settings.OLCRTC_CARRIER,
-            room_id = settings.OLCRTC_JITSI_URL + f"/{getRandomRoomId()}",
-            transport = settings.OLCRTC_TRANSPORT,
-            key = getRandomKey(),
-            dns = settings.OLCRTC_DNS,
-            name = settings.OLCRTC_SERVER_NAME
+            locations=[location]
         )
 
         resp = await api.add_client(client)
