@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Response
+from fastapi.responses import PlainTextResponse
 import uvicorn
 
 from rw import isUserValid
@@ -29,7 +30,7 @@ async def getSub(short_uuid: str):
     
     subscription = await olcmanager.getSubscription(client.client_id)
 
-    return subscription
+    return PlainTextResponse(subscription)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0")
