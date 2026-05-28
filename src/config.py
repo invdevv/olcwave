@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     OLCRTC_SUB_PATH: str
     OLCRTC_CARRIER: str
-    OLCRTC_TRANSPORT: Transport
+    OLCRTC_TRANSPORT: str
     OLCRTC_SERVER_NAME: str
     OLCRTC_DNS: str
     OLCRTC_JITSI_URL: str
