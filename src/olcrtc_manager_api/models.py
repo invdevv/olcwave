@@ -202,23 +202,9 @@ class ChangePasswordResponse(BaseModel):
 # ──────────────────────────────────────────────
 
 class AddClientRequest(BaseModel):
-    """
-    Request body for POST /api/clients.
-
-    Supply carrier + transport + dns for an explicit location,
-    or from_client to clone locations from an existing client.
-    """
     client_id: str
-    from_client: str = Field("", alias="from_client")
     quota: Quota = Field(default_factory=Quota)  # pyright: ignore[reportArgumentType]
-    carrier: str = ""
-    room_id: str = ""
-    transport: str = ""
-    key: str = ""
-    payload: Optional[dict[str, str]] = None
-    dns: str = ""
-    name: str = ""
-
+    locations: list[Location]
     model_config = {"populate_by_name": True}
 
 
