@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from olcrtc_manager_api.models import Transport
+
 class Settings(BaseSettings):
     BASE_HOST: str
     BASE_PORT: int
@@ -13,7 +15,7 @@ class Settings(BaseSettings):
 
     OLCRTC_SUB_PATH: str
     OLCRTC_CARRIER: str
-    OLCRTC_TRANSPORT: str
+    OLCRTC_TRANSPORT: Transport
     OLCRTC_SERVER_NAME: str
     OLCRTC_DNS: str
     OLCRTC_JITSI_URL: str
