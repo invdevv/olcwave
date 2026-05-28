@@ -29,12 +29,10 @@ async def addClient(client_id: str, sub: SubscriptionInfoResponseDto):
 
         location = Location(
             name = settings.OLCRTC_SERVER_NAME,
-            client_id = client_id,
-            endpoint=Endpoint(room_id=settings.OLCRTC_JITSI_URL + f"/{getRandomRoomId()}", key = getRandomKey()),
+            room_id = settings.OLCRTC_JITSI_URL + f"/{getRandomRoomId()}",
+            key = getRandomKey(),
             carrier = settings.OLCRTC_CARRIER,
             transport = settings.OLCRTC_TRANSPORT,  # pyright: ignore[reportArgumentType]
-            link = "direct",
-            data = "data",
             dns = settings.OLCRTC_DNS,
         )
 

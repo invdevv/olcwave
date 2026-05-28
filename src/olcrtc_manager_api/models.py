@@ -31,14 +31,13 @@ class Transport(BaseModel):
 
 
 class Location(BaseModel):
-    name: str = ""
-    client_id: str = Field("", alias="client_id")
-    endpoint: Endpoint = Field(default_factory=Endpoint)  # pyright: ignore[reportArgumentType]
-    carrier: str = ""
+    name: str
+    room_id: str
+    key: str
+    carrier: str
     transport: str
-    link: str = ""
-    data: str = ""
-    dns: str = ""
+    payload: dict[str, str] = Field(default_factory=dict)
+    dns: str
 
     model_config = {"populate_by_name": True}
 
@@ -205,6 +204,7 @@ class AddClientRequest(BaseModel):
     client_id: str
     quota: Quota = Field(default_factory=Quota)  # pyright: ignore[reportArgumentType]
     locations: list[Location]
+    
     model_config = {"populate_by_name": True}
 
 
