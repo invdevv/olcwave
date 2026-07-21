@@ -74,7 +74,7 @@ class OlcRTC:
 
     @staticmethod
     def get_config(name: str):
-        return client.containers.get(name).exec_run("cat /app/config.yaml")  # pyright: ignore[reportUnknownMemberType]
+        return client.containers.get(name).exec_run("cat /tmp/olcwave/config.yaml")  # pyright: ignore[reportUnknownMemberType]
 
     @staticmethod
     def get_stats(name: str) -> dict:  # pyright: ignore[reportUnknownParameterType]

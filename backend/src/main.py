@@ -16,7 +16,7 @@ from traffic import TrafficManager
 
 
 async def lifespan(app: FastAPI):
-    await create_tables()
+    await create_tables() # TODO: add alembic migrations
     task = asyncio.create_task(TrafficManager.run())
     yield
     task.cancel()
