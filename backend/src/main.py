@@ -12,7 +12,7 @@ from database import create_tables
 
 
 async def lifespan(app: FastAPI):
-    await create_tables(True)
+    await create_tables()
 
     yield
 

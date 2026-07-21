@@ -1,8 +1,0 @@
-services:
-  app:
-    build:
-      context: .
-    container_name: olcwave
-    restart: always
-    ports:
-      - "8000:8000"

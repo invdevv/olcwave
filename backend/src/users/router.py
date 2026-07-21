@@ -20,3 +20,9 @@ async def update(short_uuid: str, expires_at: datetime, _admin: dict = Depends(g
 async def delete(short_uuid: str, _admin: dict = Depends(get_current_admin)):
     user = await Users.delete(short_uuid)
     return user
+
+@router.get("/all")
+async def get_all(tag: str, _admin: dict = Depends(get_current_admin)):
+    users = await Users.get_all()
+
+    return users

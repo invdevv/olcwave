@@ -1,3 +1,9 @@
+from typing import Sequence
+
+
+from backend.src.users.models import User
+
+
 from fastapi import HTTPException, status
 from datetime import datetime
 
@@ -46,3 +52,15 @@ class UserDB:
         await db.commit()
 
         return True
+
+    @staticmethod
+    async def get_all(db: AsyncSession, short_uuid: str) -> UserSchema:
+        result = await db.execute(select(User))
+        users: Sequence[User] = result.scalars().all()
+        if users is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Users not found",
+            )
+        
+        return [UserSchema.model_validate(user) for user in users]

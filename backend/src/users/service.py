@@ -26,4 +26,9 @@ class Users:
         async with async_session_factory() as db:  
             _=await UserDB.delete(db, short_uuid) 
 
+    @staticmethod
+    async def get_all() -> list[UserSchema]:
+        async with async_session_factory() as db:  
+            users: list[UserSchema] = await UserDB.get_all(db) 
         
+        return users
