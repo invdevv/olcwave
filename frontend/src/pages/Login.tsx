@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
-import { BoltIcon } from '@heroicons/react/24/outline'
+import { BoltIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -29,20 +29,24 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm animate-fade-in">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/10 mb-4">
-            <BoltIcon className="w-6 h-6 text-accent" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/15 text-accent mb-4 shadow-glow">
+            <BoltIcon className="w-7 h-7" />
           </div>
-          <h1 className="text-lg font-bold text-text-primary">OLC Wave</h1>
-          <p className="text-xs text-text-muted mt-1">Admin Panel</p>
+          <h1 className="text-xl font-bold text-text-primary tracking-tight">OLC Wave</h1>
+          <p className="text-sm text-text-muted mt-1">Sign in to the admin panel</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-bg-secondary border border-border rounded-lg p-5 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-bg-secondary border border-border rounded-xl shadow-elevated p-6 space-y-4"
+        >
           {error && (
-            <div className="bg-danger/10 border border-danger/20 rounded-md px-3 py-2 text-xs text-danger">
-              {error}
+            <div className="flex items-center gap-2 bg-danger/10 border border-danger/20 rounded-lg px-3 py-2.5 text-sm text-danger animate-fade-in">
+              <ExclamationCircleIcon className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
           <Input
@@ -63,10 +67,14 @@ export default function Login() {
             autoComplete="current-password"
             required
           />
-          <Button type="submit" loading={loading} className="w-full">
+          <Button type="submit" size="lg" loading={loading} className="w-full">
             Sign In
           </Button>
         </form>
+
+        <p className="text-center text-xs text-text-muted mt-6">
+          OLC Wave · Admin Panel
+        </p>
       </div>
     </div>
   )

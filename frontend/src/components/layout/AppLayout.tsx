@@ -7,12 +7,14 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
-      <div className={`transition-all duration-200 ${collapsed ? 'ml-14' : 'ml-52'}`}>
+      <div className={`transition-all duration-200 ${collapsed ? 'ml-16' : 'ml-60'}`}>
         <Topbar />
-        <main className="p-4 animate-fade-in">
-          <Outlet />
+        <main className="px-6 py-6">
+          <div className="mx-auto max-w-6xl animate-fade-in">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

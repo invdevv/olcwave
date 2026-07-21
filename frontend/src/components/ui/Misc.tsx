@@ -1,4 +1,32 @@
 import { type ReactNode } from 'react'
+import { InboxIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+
+interface CardProps {
+  children: ReactNode
+  className?: string
+}
+
+export function Card({ children, className = '' }: CardProps) {
+  return (
+    <div className={`bg-bg-secondary border border-border rounded-xl shadow-soft ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+interface CardHeaderProps {
+  title: string
+  action?: ReactNode
+}
+
+export function CardHeader({ title, action }: CardHeaderProps) {
+  return (
+    <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-3">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">{title}</h3>
+      {action}
+    </div>
+  )
+}
 
 interface TabsProps {
   tabs: { key: string; label: string }[]
@@ -8,17 +36,20 @@ interface TabsProps {
 
 export function Tabs({ tabs, active, onChange }: TabsProps) {
   return (
-    <div className="flex gap-0.5 border-b border-border">
+    <div className="flex gap-1 border-b border-border">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
-          className={`px-3 py-2 text-sm font-medium transition-colors cursor-pointer
+          className={`relative px-3.5 py-2.5 text-sm font-medium transition-colors cursor-pointer
             ${active === tab.key
-              ? 'text-accent border-b-2 border-accent'
+              ? 'text-text-primary'
               : 'text-text-secondary hover:text-text-primary'}`}
         >
           {tab.label}
+          {active === tab.key && (
+            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent rounded-full" />
+          )}
         </button>
       ))}
     </div>
@@ -35,35 +66,56 @@ interface StatCardProps {
 
 export function StatCard({ title, value, subtitle, icon }: StatCardProps) {
   return (
-    <div className="bg-bg-secondary border border-border rounded-lg p-4 hover:border-border-light transition-colors">
-      <div className="flex items-start justify-between">
-        <div>
+    <div className="group bg-bg-secondary border border-border rounded-xl p-5 shadow-soft
+      transition-all duration-200 hover:border-border-light hover:-translate-y-0.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-xs font-medium text-text-muted uppercase tracking-wider">{title}</p>
-          <p className="text-2xl font-bold text-text-primary mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-text-secondary mt-1">{subtitle}</p>}
+          <p className="text-3xl font-bold text-text-primary mt-2 tracking-tight tabular-nums">{value}</p>
+          {subtitle && <p className="text-xs text-text-secondary mt-1.5">{subtitle}</p>}
         </div>
-        {icon && <div className="text-text-muted">{icon}</div>}
+        {icon && (
+          <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-accent/10 text-accent
+            transition-colors group-hover:bg-accent/15">
+            {icon}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-export function EmptyState({ message = 'No data available' }: { message?: string }) {
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`skeleton rounded-md ${className}`} />
+}
+
+export function EmptyState({
+  message = 'No data available',
+  hint,
+  icon,
+  action,
+}: {
+  message?: string
+  hint?: string
+  icon?: ReactNode
+  action?: ReactNode
+}) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-text-muted">
-      <svg className="w-10 h-10 mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-      </svg>
-      <p className="text-sm">{message}</p>
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-bg-tertiary text-text-muted mb-4">
+        {icon || <InboxIcon className="w-6 h-6" />}
+      </div>
+      <p className="text-sm font-medium text-text-secondary">{message}</p>
+      {hint && <p className="text-xs text-text-muted mt-1.5 max-w-xs">{hint}</p>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   )
 }
 
 export function LoadingState({ text = 'Loading...' }: { text?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="w-7 h-7 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
       <p className="text-sm text-text-muted">{text}</p>
     </div>
   )
@@ -71,15 +123,18 @@ export function LoadingState({ text = 'Loading...' }: { text?: string }) {
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-danger">
-      <svg className="w-8 h-8 mb-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-      </svg>
-      <p className="text-sm mb-2">{message}</p>
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger/10 text-danger mb-4">
+        <ExclamationTriangleIcon className="w-6 h-6" />
+      </div>
+      <p className="text-sm font-medium text-text-primary">Something went wrong</p>
+      <p className="text-xs text-text-muted mt-1.5 max-w-sm">{message}</p>
       {onRetry && (
-        <button onClick={onRetry} className="text-xs text-accent hover:text-accent-hover cursor-pointer">
-          Retry
+        <button
+          onClick={onRetry}
+          className="mt-4 text-xs font-medium text-accent hover:text-accent-hover cursor-pointer transition-colors"
+        >
+          Try again
         </button>
       )}
     </div>
