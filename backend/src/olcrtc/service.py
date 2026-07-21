@@ -1,7 +1,7 @@
 from docker.models.containers import Container
 
 from olcrtc.sdk import OlcRTC
-from olcrtc.schemas import ContainerSchema, ContainerConfigSchema, ContainerLogsSchema
+from olcrtc.schemas import ContainerSchema, ContainerConfigSchema, ContainerLogsSchema, ContainerStatsSchema
 
 class Containers:
     @staticmethod
@@ -55,3 +55,15 @@ class Containers:
     def get_config(name: str) -> ContainerConfigSchema:
         config: str = OlcRTC.get_config(name).output.decode()  # pyright: ignore[reportAny]
         return ContainerConfigSchema(name=name, config=config)
+
+    @staticmethod
+    def get_stats(name: str) -> ContainerStatsSchema:
+        data = OlcRTC.get_stats(name)
+        return ContainerStatsSchema(
+            name=name,
+            upload_bytes=int(data.get("upload_bytes", 0)),
+            download_bytes=int(data.get("download_bytes", 0)),
+            total_bytes=int(data.get("total_bytes", 0)),
+            upload_rate_bps=int(data.get("upload_rate_bps", 0)),
+            download_rate_bps=int(data.get("download_rate_bps", 0)),
+        )

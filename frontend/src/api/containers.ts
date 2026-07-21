@@ -1,5 +1,5 @@
 import api from './client'
-import type { Container, ContainerLogs, ContainerConfig } from '../types'
+import type { Container, ContainerLogs, ContainerConfig, ContainerStats } from '../types'
 
 export const containersApi = {
   getAll: () =>
@@ -22,4 +22,7 @@ export const containersApi = {
 
   getConfig: (name: string) =>
     api.get<ContainerConfig>('/containers/config', { params: { name } }),
+
+  stats: (name: string) =>
+    api.get<ContainerStats>('/containers/stats', { params: { name } }),
 }

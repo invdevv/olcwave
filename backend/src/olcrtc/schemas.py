@@ -16,3 +16,11 @@ class ContainerLogsSchema(BaseModel):
 class ContainerConfigSchema(BaseModel):
     name: str
     config: str
+
+class ContainerStatsSchema(BaseModel):
+    name: str
+    upload_bytes: int = 0
+    download_bytes: int = 0
+    total_bytes: int = 0
+    upload_rate_bps: int = 0
+    download_rate_bps: int = 0

@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,12 +12,18 @@ from subscriptions.router import router as subscriptions_router
 from olcrtc.router import router as containers_router
 from config import settings
 from database import create_tables
+from traffic import TrafficManager
 
 
 async def lifespan(app: FastAPI):
     await create_tables()
-
+    task = asyncio.create_task(TrafficManager.run())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(lifespan=lifespan)  # pyright: ignore[reportArgumentType]
 

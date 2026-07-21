@@ -1,6 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Container } from '../../types'
 import { containersApi } from '../../api/containers'
+import { formatBytes, formatRate } from '../../utils/format'
 import StatusBadge from './StatusBadge'
 import {
   PlayIcon,
@@ -9,6 +10,8 @@ import {
   DocumentTextIcon,
   CodeBracketIcon,
   CubeIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from '@heroicons/react/24/outline'
 
 type Action = 'run' | 'stop' | 'restart'
@@ -43,6 +46,13 @@ export default function ContainerCard({ container, onLogs, onConfig, onError, on
   const isRunning = container.status === 'running'
   const created = new Date(container.created)
 
+  const { data: stats } = useQuery({
+    queryKey: ['container-stats', container.name],
+    queryFn: () => containersApi.stats(container.name).then((r) => r.data),
+    enabled: isRunning,
+    refetchInterval: isRunning ? 5000 : false,
+  })
+
   return (
     <div className="group bg-bg-secondary border border-border rounded-xl p-4 shadow-soft
       transition-all duration-200 hover:border-border-light hover:-translate-y-0.5 flex flex-col gap-3.5">
@@ -67,6 +77,27 @@ export default function ContainerCard({ container, onLogs, onConfig, onError, on
         <Meta label="Created" value={`${created.toLocaleDateString()} ${created.toLocaleTimeString()}`} />
         <Meta label="Image" value={container.image} mono />
       </div>
+
+      {/* Traffic */}
+      {isRunning && (
+        <div className="rounded-lg bg-bg-tertiary/50 border border-border px-3 py-2.5 space-y-2">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <TrafficStat label="Upload" value={formatBytes(stats?.upload_bytes ?? 0)} />
+            <TrafficStat label="Download" value={formatBytes(stats?.download_bytes ?? 0)} />
+            <TrafficStat label="Total" value={formatBytes(stats?.total_bytes ?? 0)} accent />
+          </div>
+          <div className="flex items-center gap-4 pt-1.5 border-t border-border/60 text-xs">
+            <span className="inline-flex items-center gap-1 text-info">
+              <ArrowDownIcon className="w-3 h-3" />
+              <span className="tabular-nums">{formatRate(stats?.download_rate_bps ?? 0)}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 text-success">
+              <ArrowUpIcon className="w-3 h-3" />
+              <span className="tabular-nums">{formatRate(stats?.upload_rate_bps ?? 0)}</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border">
@@ -98,6 +129,17 @@ export default function ContainerCard({ container, onLogs, onConfig, onError, on
           <ActionButton icon={CodeBracketIcon} label="Config" onClick={() => onConfig(container)} disabled={mutation.isPending} />
         </div>
       </div>
+    </div>
+  )
+}
+
+function TrafficStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wider text-text-muted">{label}</p>
+      <p className={`truncate tabular-nums font-medium ${accent ? 'text-accent' : 'text-text-secondary'}`} title={value}>
+        {value}
+      </p>
     </div>
   )
 }

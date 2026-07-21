@@ -1,3 +1,4 @@
+import json
 import docker
 from docker.errors import ImageNotFound
 from docker.models.containers import Container
@@ -53,7 +54,7 @@ class OlcRTC:
 
     @staticmethod
     def restart(name: str):
-        client.containers.get(name).restart()
+        client.containers.get(name).restart()  # pyright: ignore[reportUnknownMemberType]
 
     @staticmethod
     def remove(name: str):
@@ -74,3 +75,21 @@ class OlcRTC:
     @staticmethod
     def get_config(name: str):
         return client.containers.get(name).exec_run("cat /app/config.yaml")  # pyright: ignore[reportUnknownMemberType]
+
+    @staticmethod
+    def get_stats(name: str) -> dict:  # pyright: ignore[reportUnknownParameterType]
+        result = client.containers.get(name).exec_run("cat /var/lib/olcwave/stats.json")  # pyright: ignore[reportUnknownMemberType]
+
+        if result.exit_code != 0:  # pyright: ignore[reportAny]
+            return {}
+
+        raw = result.output.decode().strip()
+        if not raw:
+            return {}
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+
+        return data if isinstance(data, dict) else {}

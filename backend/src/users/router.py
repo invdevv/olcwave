@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 
 from auth.dependencies import get_current_admin
 from users.service import Users
+from users.schemas import TrafficInfoSchema, TrafficLimitUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -26,3 +27,17 @@ async def get_all(tag: str, _admin: dict = Depends(get_current_admin)):
     users = await Users.get_all()
 
     return users
+
+@router.get("/traffic")
+async def get_traffic(short_uuid: str, _admin: dict = Depends(get_current_admin)) -> TrafficInfoSchema:
+    return await Users.get_traffic(short_uuid)
+
+@router.patch("/traffic")
+async def update_traffic(short_uuid: str, body: TrafficLimitUpdate, _admin: dict = Depends(get_current_admin)) -> TrafficInfoSchema:
+    await Users.set_traffic_limit(short_uuid, body.traffic_limit_bytes)
+    return await Users.get_traffic(short_uuid)
+
+@router.post("/traffic/reset")
+async def reset_traffic(short_uuid: str, _admin: dict = Depends(get_current_admin)) -> TrafficInfoSchema:
+    await Users.reset_traffic(short_uuid)
+    return await Users.get_traffic(short_uuid)

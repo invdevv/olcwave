@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { StatCard, Card, CardHeader, Skeleton, EmptyState } from '../components/ui/Misc'
 import { usersApi } from '../api/users'
 import { profilesApi } from '../api/profiles'
+import { containersApi } from '../api/containers'
+import { formatBytes } from '../utils/format'
 import type { User, Profile } from '../types'
 import {
   UsersIcon,
@@ -12,6 +14,8 @@ import {
   LinkIcon,
   ArrowRightIcon,
   MagnifyingGlassIcon,
+  ChartBarIcon,
+  CubeIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
@@ -23,12 +27,21 @@ export default function Dashboard() {
     queryKey: ['profiles-all'],
     queryFn: () => profilesApi.getAll().then((r) => r.data),
   })
+  const containersQuery = useQuery({
+    queryKey: ['containers-all'],
+    queryFn: () => containersApi.getAll().then((r) => r.data),
+  })
 
   const users = usersQuery.data || []
   const profiles = profilesQuery.data || []
+  const containers = containersQuery.data || []
   const loading = usersQuery.isLoading || profilesQuery.isLoading
 
   const activeUsers = users.filter((u) => new Date(u.expires_at) > new Date()).length
+  const totalTrafficUsed = users.reduce((sum, u) => sum + (u.traffic_used_bytes || 0), 0)
+  const exceededUsers = users.filter(
+    (u) => u.traffic_limit_bytes > 0 && u.traffic_used_bytes >= u.traffic_limit_bytes
+  ).length
 
   return (
     <div className="space-y-8">
@@ -62,6 +75,42 @@ export default function Dashboard() {
                 value={users.length}
                 subtitle="Public links"
                 icon={<LinkIcon className="w-5 h-5" />}
+              />
+            </>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-text-secondary mb-4">Total Traffic Usage</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[104px] rounded-xl" />)
+          ) : (
+            <>
+              <StatCard
+                title="Used"
+                value={formatBytes(totalTrafficUsed)}
+                subtitle="Across all users"
+                icon={<ChartBarIcon className="w-5 h-5" />}
+              />
+              <StatCard
+                title="Users"
+                value={users.length}
+                subtitle={`${exceededUsers} over limit`}
+                icon={<UsersIcon className="w-5 h-5" />}
+              />
+              <StatCard
+                title="Containers"
+                value={containers.length}
+                subtitle={`${containers.filter((c) => c.status === 'running').length} running`}
+                icon={<CubeIcon className="w-5 h-5" />}
+              />
+              <StatCard
+                title="Profiles"
+                value={profiles.length}
+                subtitle="Active configs"
+                icon={<UserCircleIcon className="w-5 h-5" />}
               />
             </>
           )}

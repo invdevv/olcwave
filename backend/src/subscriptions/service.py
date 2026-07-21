@@ -160,6 +160,11 @@ class Subscriptions:
             user = UserSchema(short_uuid=short_uuid, expires_at=rw_sub.user.expires_at)
             await Users.add(user)
 
+        # Block subscription if traffic limit exceeded
+        traffic = await Users.get_traffic(short_uuid)
+        if traffic.exceeded:
+            return Response(status_code=403)
+
         # get configs for servers that already started
         tags = Subscriptions.get_launched_tags(short_uuid)
         configs: dict[str, str] = {tag: OlcRTC.get_config(f"olcwave-{tag}-{short_uuid}").output.decode() for tag in tags}  # pyright: ignore[reportAny]

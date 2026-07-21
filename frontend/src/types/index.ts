@@ -12,6 +12,8 @@ export interface User {
   short_uuid: string
   created_at: string
   expires_at: string
+  traffic_limit_bytes: number
+  traffic_used_bytes: number
 }
 
 export interface Profile {
@@ -45,6 +47,24 @@ export interface Container {
   status: string
   created: string
   image: string
+}
+
+export interface ContainerStats {
+  name: string
+  upload_bytes: number
+  download_bytes: number
+  total_bytes: number
+  upload_rate_bps: number
+  download_rate_bps: number
+}
+
+export interface TrafficInfo {
+  short_uuid: string
+  limit: number
+  used: number
+  remaining: number
+  unlimited: boolean
+  exceeded: boolean
 }
 
 export interface ContainerLogs {

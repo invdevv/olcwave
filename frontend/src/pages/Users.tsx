@@ -7,7 +7,9 @@ import Badge from '../components/ui/Badge'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import ProgressBar from '../components/ui/ProgressBar'
 import { Card, ErrorState, EmptyState, Skeleton } from '../components/ui/Misc'
+import { formatBytes, trafficPercent, bytesToGB, gbToBytes } from '../utils/format'
 import {
   MagnifyingGlassIcon,
   PencilIcon,
@@ -16,12 +18,14 @@ import {
   UsersIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Users() {
   const [search, setSearch] = useState('')
   const [editUser, setEditUser] = useState<User | null>(null)
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
+  const [trafficUser, setTrafficUser] = useState<User | null>(null)
   const queryClient = useQueryClient()
 
   const { data: users, isLoading, isError, error, refetch, isFetching } = useQuery({
@@ -84,6 +88,7 @@ export default function Users() {
                   <Th>Short UUID</Th>
                   <Th>Created</Th>
                   <Th>Expires</Th>
+                  <Th>Traffic</Th>
                   <Th>Status</Th>
                   <Th className="text-right">Actions</Th>
                 </tr>
@@ -95,13 +100,14 @@ export default function Users() {
                       <td className="px-5 py-3"><Skeleton className="h-4 w-24" /></td>
                       <td className="px-5 py-3"><Skeleton className="h-4 w-32" /></td>
                       <td className="px-5 py-3"><Skeleton className="h-4 w-32" /></td>
+                      <td className="px-5 py-3"><Skeleton className="h-4 w-28" /></td>
                       <td className="px-5 py-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
                       <td className="px-5 py-3"><Skeleton className="h-4 w-12 ml-auto" /></td>
                     </tr>
                   ))}
                 {!isLoading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <EmptyState
                         message={users?.length === 0 ? 'No users found' : 'No matching users'}
                         hint={users?.length === 0 ? undefined : 'Try adjusting your search filter.'}
@@ -117,6 +123,7 @@ export default function Users() {
                       user={user}
                       onEdit={() => setEditUser(user)}
                       onDelete={() => setDeleteUser(user)}
+                      onTraffic={() => setTrafficUser(user)}
                     />
                   ))}
               </tbody>
@@ -126,6 +133,7 @@ export default function Users() {
       )}
 
       <EditUserModal user={editUser} onClose={() => setEditUser(null)} />
+      <TrafficModal user={trafficUser} onClose={() => setTrafficUser(null)} />
       <ConfirmDialog
         open={!!deleteUser}
         onClose={() => setDeleteUser(null)}
@@ -146,11 +154,23 @@ function Th({ children, className = '' }: { children: React.ReactNode; className
   )
 }
 
-function UserRow({ user, onEdit, onDelete }: { user: User; onEdit: () => void; onDelete: () => void }) {
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-bg-tertiary border border-border rounded-lg px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-wider text-text-muted">{label}</p>
+      <p className="text-sm font-semibold text-text-primary mt-0.5 tabular-nums">{value}</p>
+    </div>
+  )
+}
+
+function UserRow({ user, onEdit, onDelete, onTraffic }: { user: User; onEdit: () => void; onDelete: () => void; onTraffic: () => void }) {
   const [copied, setCopied] = useState(false)
   const isExpired = new Date(user.expires_at) < new Date()
   const created = new Date(user.created_at)
   const expires = new Date(user.expires_at)
+  const unlimited = user.traffic_limit_bytes === 0
+  const percent = trafficPercent(user.traffic_used_bytes, user.traffic_limit_bytes)
+  const exceeded = !unlimited && user.traffic_used_bytes >= user.traffic_limit_bytes
 
   const copy = () => {
     navigator.clipboard.writeText(user.short_uuid)
@@ -175,10 +195,32 @@ function UserRow({ user, onEdit, onDelete }: { user: User; onEdit: () => void; o
       <td className="px-5 py-3 text-xs text-text-secondary whitespace-nowrap">{created.toLocaleDateString()} {created.toLocaleTimeString()}</td>
       <td className="px-5 py-3 text-xs text-text-secondary whitespace-nowrap">{expires.toLocaleDateString()} {expires.toLocaleTimeString()}</td>
       <td className="px-5 py-3">
-        <Badge variant={isExpired ? 'danger' : 'success'} dot>{isExpired ? 'Expired' : 'Active'}</Badge>
+        <div className="w-40 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-text-secondary tabular-nums">
+              {formatBytes(user.traffic_used_bytes)} / {unlimited ? '∞' : formatBytes(user.traffic_limit_bytes)}
+            </span>
+            {!unlimited && <span className="text-text-muted tabular-nums">{percent}%</span>}
+          </div>
+          <ProgressBar percent={percent} unlimited={unlimited} />
+        </div>
+      </td>
+      <td className="px-5 py-3">
+        {exceeded ? (
+          <Badge variant="danger" dot>Traffic exceeded</Badge>
+        ) : (
+          <Badge variant={isExpired ? 'danger' : 'success'} dot>{isExpired ? 'Expired' : 'Active'}</Badge>
+        )}
       </td>
       <td className="px-5 py-3 text-right">
         <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={onTraffic}
+            className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors cursor-pointer"
+            title="Traffic management"
+          >
+            <ChartBarIcon className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={onEdit}
             className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors cursor-pointer"
@@ -237,6 +279,131 @@ function EditUserModal({ user, onClose }: { user: User | null; onClose: () => vo
           </Button>
         </div>
       </div>
+    </Modal>
+  )
+}
+
+function TrafficModal({ user, onClose }: { user: User | null; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const [limitGb, setLimitGb] = useState('')
+  const [unlimited, setUnlimited] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  const { data: traffic, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['user-traffic', user?.short_uuid],
+    queryFn: () => usersApi.getTraffic(user!.short_uuid).then((r) => r.data),
+    enabled: !!user,
+  })
+
+  useEffect(() => {
+    if (traffic) {
+      setUnlimited(traffic.unlimited)
+      setLimitGb(traffic.unlimited ? '' : bytesToGB(traffic.limit).toFixed(2))
+    }
+    setConfirmReset(false)
+  }, [traffic])
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['users-all'] })
+    queryClient.invalidateQueries({ queryKey: ['user-traffic', user?.short_uuid] })
+  }
+
+  const limitMutation = useMutation({
+    mutationFn: (bytes: number) => usersApi.setTrafficLimit(user!.short_uuid, bytes),
+    onSuccess: () => {
+      invalidate()
+      onClose()
+    },
+  })
+
+  const resetMutation = useMutation({
+    mutationFn: () => usersApi.resetTraffic(user!.short_uuid),
+    onSuccess: () => {
+      invalidate()
+      setConfirmReset(false)
+      refetch()
+    },
+  })
+
+  if (!user) return null
+
+  const saveLimit = () => {
+    const bytes = unlimited ? 0 : gbToBytes(parseFloat(limitGb) || 0)
+    limitMutation.mutate(bytes)
+  }
+  const percent = traffic ? trafficPercent(traffic.used, traffic.limit) : 0
+
+  return (
+    <Modal open={!!user} onClose={onClose} title="Traffic Management" description={user.short_uuid}>
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16 rounded-lg" />
+          <Skeleton className="h-2 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      ) : isError ? (
+        <ErrorState
+          message={(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to load traffic'}
+          onRetry={() => refetch()}
+        />
+      ) : traffic ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-3">
+            <StatBox label="Used" value={formatBytes(traffic.used)} />
+            <StatBox label="Limit" value={traffic.unlimited ? '∞' : formatBytes(traffic.limit)} />
+            <StatBox label="Remaining" value={traffic.unlimited ? '∞' : formatBytes(traffic.remaining)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>{traffic.unlimited ? 'Unlimited plan' : `${percent}% used`}</span>
+              {traffic.exceeded && <span className="text-danger font-medium">Traffic exceeded</span>}
+            </div>
+            <ProgressBar percent={percent} unlimited={traffic.unlimited} />
+          </div>
+
+          <div className="border-t border-border pt-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={unlimited}
+                onChange={(e) => setUnlimited(e.target.checked)}
+                className="accent-accent w-4 h-4 cursor-pointer"
+              />
+              Unlimited traffic
+            </label>
+            {!unlimited && (
+              <Input
+                label="Traffic limit (GB)"
+                type="number"
+                min="0"
+                step="0.1"
+                value={limitGb}
+                onChange={(e) => setLimitGb(e.target.value)}
+                placeholder="e.g. 100"
+              />
+            )}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              {confirmReset ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">Reset used traffic to 0?</span>
+                  <Button size="sm" variant="danger" loading={resetMutation.isPending} onClick={() => resetMutation.mutate()}>
+                    Confirm
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={() => setConfirmReset(true)}>
+                  Reset traffic
+                </Button>
+              )}
+              <Button loading={limitMutation.isPending} onClick={saveLimit}>
+                Change limit
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Modal>
   )
 }

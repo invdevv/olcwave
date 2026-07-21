@@ -18,7 +18,7 @@ RUN mage build
 
 WORKDIR /build/proxy
 
-COPY proxy.go .
+COPY proxy.go go.mod go.sum ./
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build \
