@@ -37,6 +37,26 @@ export interface SubscriptionBundle {
   locations: SubscriptionLocation[]
 }
 
+export interface Container {
+  id: string
+  name: string
+  user_id: string
+  config_tag: string
+  status: string
+  created: string
+  image: string
+}
+
+export interface ContainerLogs {
+  name: string
+  logs: string
+}
+
+export interface ContainerConfig {
+  name: string
+  config: string
+}
+
 export interface ApiError {
   detail: string
 }

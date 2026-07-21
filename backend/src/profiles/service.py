@@ -37,6 +37,13 @@ class Profiles:
         async with async_session_factory() as db:  
             _=await ProfilesDB.delete(db, tag) 
 
+        for cont in OlcRTC.all():
+            if tag in cont.name:  # pyright: ignore[reportOperatorIssue]
+                OlcRTC.stop(cont.name) # pyright: ignore[reportArgumentType]
+                OlcRTC.remove(cont.name)  # pyright: ignore[reportArgumentType]
+
+
+
     @staticmethod
     async def get_all() -> list[ProfileSchema]:
         async with async_session_factory() as db:  

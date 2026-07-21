@@ -44,17 +44,33 @@ class OlcRTC:
         )
 
     @staticmethod
+    def start(name: str):
+        client.containers.get(name).start()
+
+    @staticmethod
     def stop(name: str):
         client.containers.get(name).stop()
+
+    @staticmethod
+    def restart(name: str):
+        client.containers.get(name).restart()
+
+    @staticmethod
+    def remove(name: str):
+        client.containers.get(name).remove(force=True)
 
     @staticmethod
     def logs(name: str) -> str:
         return client.containers.get(name).logs().decode()
 
     @staticmethod
-    def all() -> list[Container]:
-        return client.containers.list()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-    
+    def get(name: str) -> Container:
+        return client.containers.get(name)
+
+    @staticmethod
+    def all(include_stopped: bool = False) -> list[Container]:
+        return client.containers.list(all=include_stopped)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
     @staticmethod
     def get_config(name: str):
         return client.containers.get(name).exec_run("cat /app/config.yaml")  # pyright: ignore[reportUnknownMemberType]

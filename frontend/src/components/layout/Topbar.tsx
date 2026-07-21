@@ -4,6 +4,7 @@ const pages: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Dashboard', subtitle: 'Overview of your deployment' },
   '/users': { title: 'Users', subtitle: 'Manage user accounts and access' },
   '/profiles': { title: 'Profiles', subtitle: 'Configuration profiles' },
+  '/containers': { title: 'Containers', subtitle: 'Manage OLCRtc containers' },
   '/subscriptions': { title: 'Subscriptions', subtitle: 'Inspect subscription bundles' },
   '/settings': { title: 'Settings', subtitle: 'Application configuration' },
 }

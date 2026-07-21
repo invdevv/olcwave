@@ -151,12 +151,13 @@ class Subscriptions:
 
     @staticmethod
     async def get(short_uuid: str): 
-        if not await isUserValid(short_uuid):
+        rw_sub = await isUserValid(short_uuid)
+        if not rw_sub:
             return Response(status_code=404)
         try:
             _=await Users.get(short_uuid)
         except Exception:
-            user = UserSchema(short_uuid=short_uuid)
+            user = UserSchema(short_uuid=short_uuid, expires_at=rw_sub.user.expires_at)
             await Users.add(user)
 
         # get configs for servers that already started
