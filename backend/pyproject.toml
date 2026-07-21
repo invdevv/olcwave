@@ -1,0 +1,16 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Web panel for OLCRtc"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "docker>=7.2.0",
+    "fastapi>=0.139.2",
+    "pydantic-settings>=2.14.2",
+    "pyyaml>=6.0.3",
+    "remnawave>=2.8.0",
+    "sqlalchemy>=2.0.51",
+    "uvicorn>=0.51.0",
+]
