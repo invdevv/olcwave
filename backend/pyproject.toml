@@ -13,4 +13,5 @@ dependencies = [
     "remnawave>=2.8.0",
     "sqlalchemy>=2.0.51",
     "uvicorn>=0.51.0",
+    "PyJWT>=2.9.0",
 ]
