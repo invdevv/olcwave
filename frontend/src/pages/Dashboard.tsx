@@ -4,16 +4,44 @@ import { StatCard } from '../components/ui/Misc'
 import { usersApi } from '../api/users'
 import { profilesApi } from '../api/profiles'
 import {
-  LinkIcon,
+  UsersIcon,
+  UserCircleIcon,
   ServerIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
+  const usersQuery = useQuery({
+    queryKey: ['users-all'],
+    queryFn: () => usersApi.getAll().then((r) => r.data),
+  })
+  const profilesQuery = useQuery({
+    queryKey: ['profiles-all'],
+    queryFn: () => profilesApi.getAll().then((r) => r.data),
+  })
+
+  const users = usersQuery.data || []
+  const profiles = profilesQuery.data || []
+
+  const activeUsers = users.filter((u) => new Date(u.expires_at) > new Date()).length
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">System Overview</h2>
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Overview</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard
+            title="Users"
+            value={users.length}
+            subtitle={`${activeUsers} active`}
+            icon={<UsersIcon className="w-5 h-5" />}
+          />
+          <StatCard
+            title="Profiles"
+            value={profiles.length}
+            subtitle={`${profiles.length} configs`}
+            icon={<UserCircleIcon className="w-5 h-5" />}
+          />
           <StatCard
             title="Status"
             value="Online"
@@ -21,18 +49,66 @@ export default function Dashboard() {
             icon={<ServerIcon className="w-5 h-5" />}
           />
           <StatCard
-            title="Note"
-            value="—"
-            subtitle="Backend has no aggregate stats endpoint"
+            title="Subscriptions"
+            value={users.length}
+            subtitle="Public links"
             icon={<LinkIcon className="w-5 h-5" />}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <QuickLookup />
-        <RecentInfo />
+        <RecentUsers users={users.slice(0, 5)} />
+        <RecentProfiles profiles={profiles.slice(0, 5)} />
       </div>
+
+      <QuickLookup />
+    </div>
+  )
+}
+
+function RecentUsers({ users }: { users: import('../types').User[] }) {
+  return (
+    <div className="bg-bg-secondary border border-border rounded-lg">
+      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Recent Users</h3>
+        <a href="/users" className="text-xs text-accent hover:text-accent-hover cursor-pointer">View all</a>
+      </div>
+      {users.length === 0 ? (
+        <p className="px-4 py-6 text-xs text-text-muted text-center">No users yet</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {users.map((u) => (
+            <div key={u.short_uuid} className="px-4 py-2.5 flex items-center justify-between hover:bg-bg-hover transition-colors">
+              <code className="text-xs font-mono text-accent">{u.short_uuid}</code>
+              <span className="text-xs text-text-muted">{new Date(u.created_at).toLocaleDateString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RecentProfiles({ profiles }: { profiles: import('../types').Profile[] }) {
+  return (
+    <div className="bg-bg-secondary border border-border rounded-lg">
+      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Recent Profiles</h3>
+        <a href="/profiles" className="text-xs text-accent hover:text-accent-hover cursor-pointer">View all</a>
+      </div>
+      {profiles.length === 0 ? (
+        <p className="px-4 py-6 text-xs text-text-muted text-center">No profiles yet</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {profiles.map((p) => (
+            <div key={p.tag} className="px-4 py-2.5 flex items-center justify-between hover:bg-bg-hover transition-colors">
+              <span className="text-sm text-text-primary">{p.name}</span>
+              <code className="text-xs font-mono text-text-muted">{p.tag}</code>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -42,13 +118,13 @@ function QuickLookup() {
   const [tag, setTag] = useState('')
 
   const userQuery = useQuery({
-    queryKey: ['user-lookup', uuid],
+    queryKey: ['user-lookup-dash', uuid],
     queryFn: () => usersApi.getByShortUuid(uuid).then((r) => r.data),
     enabled: false,
   })
 
   const profileQuery = useQuery({
-    queryKey: ['profile-lookup', tag],
+    queryKey: ['profile-lookup-dash', tag],
     queryFn: () => profilesApi.getByTag(tag).then((r) => r.data),
     enabled: false,
   })
@@ -113,33 +189,3 @@ function QuickLookup() {
     </div>
   )
 }
-
-function RecentInfo() {
-  return (
-    <div className="bg-bg-secondary border border-border rounded-lg p-4">
-      <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">About</h3>
-      <div className="space-y-2 text-xs text-text-secondary">
-        <p>OLC WebRTC subscription manager with Remnawave integration.</p>
-        <div className="border-t border-border pt-2 mt-2">
-          <p className="text-text-muted uppercase tracking-wider mb-1">Backend Capabilities</p>
-          <ul className="space-y-1 list-disc list-inside">
-            <li>User management (lookup by short UUID)</li>
-            <li>Profile management (CRUD by tag)</li>
-            <li>Public subscription endpoint</li>
-            <li>Docker container orchestration</li>
-          </ul>
-        </div>
-        <div className="border-t border-border pt-2 mt-2">
-          <p className="text-text-muted uppercase tracking-wider mb-1">Limitations</p>
-          <ul className="space-y-1 list-disc list-inside text-warning/80">
-            <li>No "list all users" endpoint</li>
-            <li>No "list all profiles" endpoint</li>
-            <li>Database wiped on backend restart</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-

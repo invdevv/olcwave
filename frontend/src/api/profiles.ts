@@ -2,7 +2,10 @@ import api from './client'
 import type { Profile } from '../types'
 
 export const profilesApi = {
-  create: (profile: Omit<Profile, 'id'>) =>
+  getAll: () =>
+    api.get<Profile[]>('/profiles/all', { params: { tag: '' } }),
+
+  create: (profile: Pick<Profile, 'name' | 'tag' | 'profile'>) =>
     api.post<string>('/profiles/', profile),
 
   getByTag: (tag: string) =>

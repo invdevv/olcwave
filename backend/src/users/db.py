@@ -1,7 +1,7 @@
 from typing import Sequence
 
 
-from backend.src.users.models import User
+from users.models import User
 
 
 from fastapi import HTTPException, status
@@ -54,7 +54,7 @@ class UserDB:
         return True
 
     @staticmethod
-    async def get_all(db: AsyncSession, short_uuid: str) -> UserSchema:
+    async def get_all(db: AsyncSession) -> UserSchema:
         result = await db.execute(select(User))
         users: Sequence[User] = result.scalars().all()
         if users is None:
