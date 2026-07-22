@@ -5,13 +5,16 @@ services:
       dockerfile: Dockerfile
 
     container_name: olcwave-api
-    restart: unless-stopped
+    restart: always
 
     env_file:
       - ./backend/.env
 
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+
+    ports:
+      - "8000:8000"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -30,10 +33,8 @@ services:
     container_name: olcwave-postgres
     restart: unless-stopped
 
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    env_file:
+      - ./backend/.env
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -42,11 +43,12 @@ services:
       - app
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
       interval: 5s
       timeout: 5s
       retries: 10
-
 
 networks:
   app:
