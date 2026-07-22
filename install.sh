@@ -325,6 +325,7 @@ print_summary() {
   printf '  %s%s installed successfully%s\n\n' "$C_BOLD" "$SUB_NAME" "$C_RESET"
   printf '  Panel\n    %s\n\n'                 "$PANEL_URL"
   printf '  Admin username\n    %s\n\n'        "$ADMIN_USERNAME"
+  printf '  Admin password\n    %s\n\n'        "$ADMIN_PASSWORD"
   printf '  Subscription template\n    %s\n\n' "$SUB_URL_TEMPLATE"
   printf '  Containers\n    docker compose ps\n\n'
   printf '  API logs\n    docker compose logs -f api\n\n'
