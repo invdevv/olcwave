@@ -97,23 +97,72 @@ generate_secret() {
   fi
 }
 
+require_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    die "Please run this script as root."
+  fi
+}
+
 # ---------------------------------------------------------------------------
-# 1. Dependency checks
+# 1. Dependency checks and installs
 # ---------------------------------------------------------------------------
+install_docker() {
+  info "Installing Docker..."
+
+  if command -v docker >/dev/null 2>&1; then
+    success "Docker already installed."
+    return
+  fi
+
+  info "Downloading Docker installer..."
+
+  curl -fsSL https://get.docker.com | sh
+
+  systemctl enable --now docker
+
+  success "Docker installed."
+}
+
+
+install_nodejs() {
+  info "Installing Node.js..."
+
+  if command -v npm >/dev/null 2>&1; then
+    success "npm already installed."
+    return
+  fi
+
+  info "Installing Node.js 20..."
+
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+
+  apt-get install -y nodejs
+
+  success "Node.js installed."
+}
+
+
 check_dependencies() {
   info "Checking prerequisites..."
 
-  command -v docker >/dev/null 2>&1 \
-    || die "docker is not installed. See docs/installation.md (step 1)."
+  if ! command -v docker >/dev/null 2>&1; then
+    install_docker
+  fi
 
-  # Compose v2 is invoked as 'docker compose' (two words).
-  docker compose version >/dev/null 2>&1 \
-    || die "'docker compose' is not available. Install the Docker Compose plugin."
+  if ! docker compose version >/dev/null 2>&1; then
+    die "'docker compose' is not available after Docker installation."
+  fi
 
-  command -v npm >/dev/null 2>&1 \
-    || die "npm is not installed. The frontend is built on the host. See docs/installation.md (step 2)."
+  if ! command -v npm >/dev/null 2>&1; then
+    install_nodejs
+  fi
 
   success "docker, docker compose and npm are present."
+
+  docker --version
+  docker compose version
+  node --version
+  npm --version
 }
 
 # ---------------------------------------------------------------------------
@@ -293,6 +342,7 @@ print_summary() {
 # Main
 # ---------------------------------------------------------------------------
 main() {
+  require_root
   check_dependencies
   collect_input
   write_backend_env
