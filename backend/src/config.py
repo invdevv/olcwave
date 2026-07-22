@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Interval (seconds) for the background traffic collection loop.
     TRAFFIC_COLLECT_INTERVAL: int
 
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: list[str]
 
     model_config = SettingsConfigDict(env_file=".env")  # pyright: ignore[reportUnannotatedClassAttribute]
 

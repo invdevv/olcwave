@@ -249,6 +249,7 @@ write_backend_env() {
     printf '# %s GB in bytes (0 = unlimited)\n' "$TRAFFIC_GB"
     printf 'DEFAULT_TRAFFIC_LIMIT=%s\n'      "$DEFAULT_TRAFFIC_LIMIT"
     printf 'TRAFFIC_COLLECT_INTERVAL=%s\n'   "$TRAFFIC_COLLECT_INTERVAL"
+    printf 'CORS_ORIGINS=%s\n'               "['$PANEL_URL']"
   } > backend/.env
   success "Wrote backend/.env"
 }
