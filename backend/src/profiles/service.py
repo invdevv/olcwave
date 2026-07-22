@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 import yaml
 
 from olcrtc.sdk import OlcRTC
@@ -13,6 +14,8 @@ class Profiles:
     @staticmethod
     async def add(profile: ProfileSchema):
         Profiles.validate(profile.profile)
+
+        profile.tag = profile.tag.replace("-", "")
 
         async with async_session_factory() as db:  
             _= await ProfilesDB.add(db, profile) 
