@@ -1,21 +1,20 @@
 services:
   api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
 
-    container_name: olc-api
-
+    container_name: olcwave-api
     restart: unless-stopped
-
-    ports:
-      - "8000:8000"
 
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+    networks:
+      - app
 
     depends_on:
       postgres:
@@ -25,28 +24,29 @@ services:
   postgres:
     image: postgres:16-alpine
 
-    container_name: olc-postgres
-
+    container_name: olcwave-postgres
     restart: unless-stopped
 
     environment:
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+    networks:
+      - app
+
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U postgres -d postgres"
-        ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+
+networks:
+  app:
 
 volumes:
   postgres_data:
