@@ -3,20 +3,28 @@ import { useQuery } from '@tanstack/react-query'
 import { containersApi } from '../api/containers'
 import type { Container } from '../types'
 import Button from '../components/ui/Button'
+import AutoRefreshSelect from '../components/ui/AutoRefreshSelect'
 import { Card, ErrorState, EmptyState, Skeleton } from '../components/ui/Misc'
-import ContainerCard from '../components/containers/ContainerCard'
+import ContainerRow from '../components/containers/ContainerRow'
 import CodeModal from '../components/containers/CodeModal'
 import { ToastContainer } from '../components/containers/Toast'
 import { useToasts } from '../components/containers/useToasts'
+import { useAutoRefresh } from '../utils/useAutoRefresh'
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
   CubeIcon,
   UsersIcon,
   TagIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline'
 
 type GroupMode = 'user_id' | 'config_tag'
+type SortKey = 'user_id' | 'config_tag' | 'created' | 'status'
+type SortDir = 'asc' | 'desc'
+
+const COL_SPAN = 11
 
 const groupOptions: { key: GroupMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: 'user_id', label: 'By User', icon: UsersIcon },
@@ -26,13 +34,17 @@ const groupOptions: { key: GroupMode; label: string; icon: React.ComponentType<{
 export default function Containers() {
   const [search, setSearch] = useState('')
   const [groupMode, setGroupMode] = useState<GroupMode>('user_id')
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'created', dir: 'desc' })
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [logsTarget, setLogsTarget] = useState<Container | null>(null)
   const [configTarget, setConfigTarget] = useState<Container | null>(null)
+  const [refreshMs, setRefreshMs] = useAutoRefresh('containers')
   const { toasts, dismiss, success, error } = useToasts()
 
   const { data: containers, isLoading, isError, error: queryError, refetch, isFetching } = useQuery({
     queryKey: ['containers-all'],
     queryFn: () => containersApi.getAll().then((r) => r.data),
+    refetchInterval: refreshMs || false,
   })
 
   const filtered = useMemo(() => {
@@ -55,10 +67,29 @@ export default function Containers() {
       if (arr) arr.push(c)
       else map.set(key, [c])
     }
+    const compare = (a: Container, b: Container) => {
+      const dir = sort.dir === 'asc' ? 1 : -1
+      if (sort.key === 'created') {
+        return (new Date(a.created).getTime() - new Date(b.created).getTime()) * dir
+      }
+      return a[sort.key].localeCompare(b[sort.key]) * dir
+    }
+    for (const arr of map.values()) arr.sort(compare)
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
-  }, [filtered, groupMode])
+  }, [filtered, groupMode, sort])
 
   const runningCount = filtered.filter((c) => c.status === 'running').length
+
+  const toggleSort = (key: SortKey) =>
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
+
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   return (
     <div className="space-y-5">
@@ -78,6 +109,7 @@ export default function Containers() {
           {filtered.length} containers · {runningCount} running
         </span>
         <GroupToggle mode={groupMode} onChange={setGroupMode} />
+        <AutoRefreshSelect value={refreshMs} onChange={setRefreshMs} />
         <Button variant="secondary" onClick={() => refetch()}>
           <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
@@ -93,8 +125,8 @@ export default function Containers() {
           />
         </Card>
       ) : isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-52 rounded-xl" />)}
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
         </div>
       ) : filtered.length === 0 ? (
         <Card>
@@ -116,18 +148,42 @@ export default function Containers() {
                 <span className="text-xs text-text-muted tabular-nums">{items.length}</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {items.map((c) => (
-                  <ContainerCard
-                    key={c.id}
-                    container={c}
-                    onLogs={setLogsTarget}
-                    onConfig={setConfigTarget}
-                    onSuccess={success}
-                    onError={error}
-                  />
-                ))}
-              </div>
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto max-h-[70vh]">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-bg-tertiary text-left border-b border-border">
+                        <SortableTh label="User ID" sortKey="user_id" sort={sort} onSort={toggleSort} />
+                        <SortableTh label="Config Tag" sortKey="config_tag" sort={sort} onSort={toggleSort} />
+                        <SortableTh label="Created" sortKey="created" sort={sort} onSort={toggleSort} />
+                        <Th>Uptime</Th>
+                        <Th>Total</Th>
+                        <Th>Download</Th>
+                        <Th>Upload</Th>
+                        <Th>↓ Speed</Th>
+                        <Th>↑ Speed</Th>
+                        <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
+                        <Th className="text-right">Actions</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {items.map((c) => (
+                        <ContainerRow
+                          key={c.id}
+                          container={c}
+                          expanded={expanded.has(c.id)}
+                          onToggle={() => toggleExpand(c.id)}
+                          onLogs={setLogsTarget}
+                          onConfig={setConfigTarget}
+                          onSuccess={success}
+                          onError={error}
+                          colSpan={COL_SPAN}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </section>
           ))}
         </div>
@@ -137,6 +193,39 @@ export default function Containers() {
       <ConfigModal container={configTarget} onClose={() => setConfigTarget(null)} />
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
+  )
+}
+
+function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th className={`px-4 py-2.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap ${className}`}>
+      {children}
+    </th>
+  )
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string
+  sortKey: SortKey
+  sort: { key: SortKey; dir: SortDir }
+  onSort: (key: SortKey) => void
+}) {
+  const active = sort.key === sortKey
+  return (
+    <th className="px-4 py-2.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap">
+      <button
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 transition-colors cursor-pointer hover:text-text-primary ${active ? 'text-text-primary' : ''}`}
+      >
+        {label}
+        {active && (sort.dir === 'asc' ? <ChevronUpIcon className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />)}
+      </button>
+    </th>
   )
 }
 

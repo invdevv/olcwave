@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { StatCard, Card, CardHeader, Skeleton, EmptyState } from '../components/ui/Misc'
+import AutoRefreshSelect from '../components/ui/AutoRefreshSelect'
 import { usersApi } from '../api/users'
 import { profilesApi } from '../api/profiles'
 import { containersApi } from '../api/containers'
 import { formatBytes } from '../utils/format'
+import { useAutoRefresh } from '../utils/useAutoRefresh'
 import type { User, Profile } from '../types'
 import {
   UsersIcon,
@@ -19,17 +21,22 @@ import {
 } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
+  const [refreshMs, setRefreshMs] = useAutoRefresh('dashboard')
+
   const usersQuery = useQuery({
     queryKey: ['users-all'],
     queryFn: () => usersApi.getAll().then((r) => r.data),
+    refetchInterval: refreshMs || false,
   })
   const profilesQuery = useQuery({
     queryKey: ['profiles-all'],
     queryFn: () => profilesApi.getAll().then((r) => r.data),
+    refetchInterval: refreshMs || false,
   })
   const containersQuery = useQuery({
     queryKey: ['containers-all'],
     queryFn: () => containersApi.getAll().then((r) => r.data),
+    refetchInterval: refreshMs || false,
   })
 
   const users = usersQuery.data || []
@@ -45,6 +52,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-end">
+        <AutoRefreshSelect value={refreshMs} onChange={setRefreshMs} />
+      </div>
+
       <section>
         <h2 className="text-sm font-semibold text-text-secondary mb-4">Overview</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

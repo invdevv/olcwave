@@ -8,29 +8,34 @@ import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import ProgressBar from '../components/ui/ProgressBar'
+import AutoRefreshSelect from '../components/ui/AutoRefreshSelect'
 import { Card, ErrorState, EmptyState, Skeleton } from '../components/ui/Misc'
-import { formatBytes, trafficPercent, bytesToGB, gbToBytes } from '../utils/format'
+import { ToastContainer } from '../components/containers/Toast'
+import { useToasts } from '../components/containers/useToasts'
+import { useAutoRefresh } from '../utils/useAutoRefresh'
+import { formatBytes, trafficPercent, bytesToGB, gbToBytes, buildSubUrl } from '../utils/format'
 import {
   MagnifyingGlassIcon,
-  PencilIcon,
   TrashIcon,
   ArrowPathIcon,
   UsersIcon,
   ClipboardDocumentIcon,
   CheckIcon,
-  ChartBarIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Users() {
   const [search, setSearch] = useState('')
   const [editUser, setEditUser] = useState<User | null>(null)
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
-  const [trafficUser, setTrafficUser] = useState<User | null>(null)
+  const [refreshMs, setRefreshMs] = useAutoRefresh('users')
+  const { toasts, dismiss, success, error: toastError } = useToasts()
   const queryClient = useQueryClient()
 
   const { data: users, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['users-all'],
     queryFn: () => usersApi.getAll().then((r) => r.data),
+    refetchInterval: refreshMs || false,
   })
 
   const deleteMutation = useMutation({
@@ -52,6 +57,11 @@ export default function Users() {
     )
   }, [users, search])
 
+  const copySubUrl = (user: User) => {
+    navigator.clipboard.writeText(buildSubUrl(user.short_uuid))
+    success('Copied')
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -66,6 +76,7 @@ export default function Users() {
           />
         </div>
         <span className="text-xs text-text-muted tabular-nums">{filtered.length} users</span>
+        <AutoRefreshSelect value={refreshMs} onChange={setRefreshMs} />
         <Button variant="secondary" onClick={() => refetch()}>
           <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
@@ -121,9 +132,9 @@ export default function Users() {
                     <UserRow
                       key={user.short_uuid}
                       user={user}
-                      onEdit={() => setEditUser(user)}
+                      onOpen={() => setEditUser(user)}
                       onDelete={() => setDeleteUser(user)}
-                      onTraffic={() => setTrafficUser(user)}
+                      onCopySubUrl={() => copySubUrl(user)}
                     />
                   ))}
               </tbody>
@@ -132,8 +143,14 @@ export default function Users() {
         </Card>
       )}
 
-      <EditUserModal user={editUser} onClose={() => setEditUser(null)} />
-      <TrafficModal user={trafficUser} onClose={() => setTrafficUser(null)} />
+      <UserEditModal
+        user={editUser}
+        onClose={() => setEditUser(null)}
+        onDeleted={() => setEditUser(null)}
+        onCopySubUrl={copySubUrl}
+        onToast={success}
+        onError={toastError}
+      />
       <ConfirmDialog
         open={!!deleteUser}
         onClose={() => setDeleteUser(null)}
@@ -142,6 +159,7 @@ export default function Users() {
         message={`Delete user ${deleteUser?.short_uuid}? This action cannot be undone.`}
         loading={deleteMutation.isPending}
       />
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
   )
 }
@@ -163,7 +181,17 @@ function StatBox({ label, value }: { label: string; value: string }) {
   )
 }
 
-function UserRow({ user, onEdit, onDelete, onTraffic }: { user: User; onEdit: () => void; onDelete: () => void; onTraffic: () => void }) {
+function UserRow({
+  user,
+  onOpen,
+  onDelete,
+  onCopySubUrl,
+}: {
+  user: User
+  onOpen: () => void
+  onDelete: () => void
+  onCopySubUrl: () => void
+}) {
   const [copied, setCopied] = useState(false)
   const isExpired = new Date(user.expires_at) < new Date()
   const created = new Date(user.created_at)
@@ -172,19 +200,23 @@ function UserRow({ user, onEdit, onDelete, onTraffic }: { user: User; onEdit: ()
   const percent = trafficPercent(user.traffic_used_bytes, user.traffic_limit_bytes)
   const exceeded = !unlimited && user.traffic_used_bytes >= user.traffic_limit_bytes
 
-  const copy = () => {
+  const copyUuid = (e: React.MouseEvent) => {
+    e.stopPropagation()
     navigator.clipboard.writeText(user.short_uuid)
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
   }
 
   return (
-    <tr className="hover:bg-bg-hover transition-colors group">
+    <tr
+      onClick={onOpen}
+      className="hover:bg-bg-hover transition-colors group cursor-pointer"
+    >
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
           <code className="text-xs font-mono text-accent">{user.short_uuid}</code>
           <button
-            onClick={copy}
+            onClick={copyUuid}
             className="text-text-muted hover:text-text-primary sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer"
             title="Copy UUID"
           >
@@ -213,23 +245,22 @@ function UserRow({ user, onEdit, onDelete, onTraffic }: { user: User; onEdit: ()
         )}
       </td>
       <td className="px-5 py-3 text-right">
-        <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center justify-end gap-1">
           <button
-            onClick={onTraffic}
+            onClick={(e) => {
+              e.stopPropagation()
+              onCopySubUrl()
+            }}
             className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors cursor-pointer"
-            title="Traffic management"
+            title="Copy subscription URL"
           >
-            <ChartBarIcon className="w-3.5 h-3.5" />
+            <LinkIcon className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={onEdit}
-            className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors cursor-pointer"
-            title="Edit expiry"
-          >
-            <PencilIcon className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={onDelete}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
             className="p-1.5 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
             title="Delete"
           >
@@ -241,53 +272,31 @@ function UserRow({ user, onEdit, onDelete, onTraffic }: { user: User; onEdit: ()
   )
 }
 
-function EditUserModal({ user, onClose }: { user: User | null; onClose: () => void }) {
-  const [expiry, setExpiry] = useState('')
-  const queryClient = useQueryClient()
-
-  useEffect(() => {
-    if (user) setExpiry(user.expires_at.slice(0, 16))
-  }, [user])
-
-  const mutation = useMutation({
-    mutationFn: (expiresAt: string) => usersApi.update(user!.short_uuid, expiresAt),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users-all'] })
-      onClose()
-    },
-  })
-
-  if (!user) return null
-
-  return (
-    <Modal open={!!user} onClose={onClose} title="Edit User Expiry" description="Update when this user's access expires">
-      <div className="space-y-4">
-        <div className="bg-bg-tertiary border border-border rounded-lg px-3.5 py-2.5">
-          <p className="text-xs text-text-muted mb-0.5">User</p>
-          <code className="text-sm font-mono text-accent">{user.short_uuid}</code>
-        </div>
-        <Input
-          label="Expires at"
-          type="datetime-local"
-          value={expiry}
-          onChange={(e) => setExpiry(e.target.value)}
-        />
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button loading={mutation.isPending} onClick={() => mutation.mutate(new Date(expiry).toISOString())}>
-            Save
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  )
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">{children}</p>
 }
 
-function TrafficModal({ user, onClose }: { user: User | null; onClose: () => void }) {
+function UserEditModal({
+  user,
+  onClose,
+  onDeleted,
+  onCopySubUrl,
+  onToast,
+  onError,
+}: {
+  user: User | null
+  onClose: () => void
+  onDeleted: () => void
+  onCopySubUrl: (user: User) => void
+  onToast: (message: string) => void
+  onError: (message: string) => void
+}) {
   const queryClient = useQueryClient()
+  const [expiry, setExpiry] = useState('')
   const [limitGb, setLimitGb] = useState('')
   const [unlimited, setUnlimited] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: traffic, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['user-traffic', user?.short_uuid],
@@ -296,11 +305,16 @@ function TrafficModal({ user, onClose }: { user: User | null; onClose: () => voi
   })
 
   useEffect(() => {
+    if (user) setExpiry(user.expires_at.slice(0, 16))
+    setConfirmReset(false)
+    setConfirmDelete(false)
+  }, [user])
+
+  useEffect(() => {
     if (traffic) {
       setUnlimited(traffic.unlimited)
       setLimitGb(traffic.unlimited ? '' : bytesToGB(traffic.limit).toFixed(2))
     }
-    setConfirmReset(false)
   }, [traffic])
 
   const invalidate = () => {
@@ -308,12 +322,21 @@ function TrafficModal({ user, onClose }: { user: User | null; onClose: () => voi
     queryClient.invalidateQueries({ queryKey: ['user-traffic', user?.short_uuid] })
   }
 
-  const limitMutation = useMutation({
-    mutationFn: (bytes: number) => usersApi.setTrafficLimit(user!.short_uuid, bytes),
+  const errMsg = (err: unknown, fallback: string) =>
+    (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || fallback
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const bytes = unlimited ? 0 : gbToBytes(parseFloat(limitGb) || 0)
+      await usersApi.update(user!.short_uuid, new Date(expiry).toISOString())
+      await usersApi.setTrafficLimit(user!.short_uuid, bytes)
+    },
     onSuccess: () => {
       invalidate()
+      onToast('Changes saved')
       onClose()
     },
+    onError: (err) => onError(errMsg(err, 'Failed to save changes')),
   })
 
   const resetMutation = useMutation({
@@ -322,88 +345,158 @@ function TrafficModal({ user, onClose }: { user: User | null; onClose: () => voi
       invalidate()
       setConfirmReset(false)
       refetch()
+      onToast('Traffic reset')
     },
+    onError: (err) => onError(errMsg(err, 'Failed to reset traffic')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => usersApi.delete(user!.short_uuid),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-all'] })
+      onToast('User deleted')
+      onDeleted()
+    },
+    onError: (err) => onError(errMsg(err, 'Failed to delete user')),
   })
 
   if (!user) return null
 
-  const saveLimit = () => {
-    const bytes = unlimited ? 0 : gbToBytes(parseFloat(limitGb) || 0)
-    limitMutation.mutate(bytes)
-  }
   const percent = traffic ? trafficPercent(traffic.used, traffic.limit) : 0
+  const busy = saveMutation.isPending || deleteMutation.isPending
 
   return (
-    <Modal open={!!user} onClose={onClose} title="Traffic Management" description={user.short_uuid}>
-      {isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-16 rounded-lg" />
-          <Skeleton className="h-2 w-full" />
-          <Skeleton className="h-9 w-full" />
+    <Modal open={!!user} onClose={onClose} title="Edit User" description={user.short_uuid} wide>
+      <div className="space-y-5">
+        {/* User information */}
+        <div className="space-y-2.5">
+          <SectionLabel>User information</SectionLabel>
+          <div className="bg-bg-tertiary border border-border rounded-lg divide-y divide-border">
+            <InfoRow label="UUID">
+              <code className="text-sm font-mono text-accent">{user.short_uuid}</code>
+            </InfoRow>
+            <InfoRow label="Subscription">
+              <button
+                onClick={() => onCopySubUrl(user)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-hover transition-colors cursor-pointer"
+                title={buildSubUrl(user.short_uuid)}
+              >
+                <ClipboardDocumentIcon className="w-3.5 h-3.5" />
+                Copy sub URL
+              </button>
+            </InfoRow>
+          </div>
         </div>
-      ) : isError ? (
-        <ErrorState
-          message={(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to load traffic'}
-          onRetry={() => refetch()}
-        />
-      ) : traffic ? (
-        <div className="space-y-5">
-          <div className="grid grid-cols-3 gap-3">
-            <StatBox label="Used" value={formatBytes(traffic.used)} />
-            <StatBox label="Limit" value={traffic.unlimited ? '∞' : formatBytes(traffic.limit)} />
-            <StatBox label="Remaining" value={traffic.unlimited ? '∞' : formatBytes(traffic.remaining)} />
-          </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-text-muted">
-              <span>{traffic.unlimited ? 'Unlimited plan' : `${percent}% used`}</span>
-              {traffic.exceeded && <span className="text-danger font-medium">Traffic exceeded</span>}
+        {/* Traffic settings */}
+        <div className="space-y-2.5">
+          <SectionLabel>Traffic settings</SectionLabel>
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 rounded-lg" />
+              <Skeleton className="h-2 w-full" />
             </div>
-            <ProgressBar percent={percent} unlimited={traffic.unlimited} />
-          </div>
-
-          <div className="border-t border-border pt-4 space-y-3">
-            <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={unlimited}
-                onChange={(e) => setUnlimited(e.target.checked)}
-                className="accent-accent w-4 h-4 cursor-pointer"
-              />
-              Unlimited traffic
-            </label>
-            {!unlimited && (
-              <Input
-                label="Traffic limit (GB)"
-                type="number"
-                min="0"
-                step="0.1"
-                value={limitGb}
-                onChange={(e) => setLimitGb(e.target.value)}
-                placeholder="e.g. 100"
-              />
-            )}
-            <div className="flex items-center justify-between gap-2 pt-1">
-              {confirmReset ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-muted">Reset used traffic to 0?</span>
-                  <Button size="sm" variant="danger" loading={resetMutation.isPending} onClick={() => resetMutation.mutate()}>
-                    Confirm
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Button>
+          ) : isError ? (
+            <ErrorState message={errMsg(error, 'Failed to load traffic')} onRetry={() => refetch()} />
+          ) : traffic ? (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <StatBox label="Used" value={formatBytes(traffic.used)} />
+                <StatBox label="Limit" value={traffic.unlimited ? '∞' : formatBytes(traffic.limit)} />
+                <StatBox label="Remaining" value={traffic.unlimited ? '∞' : formatBytes(traffic.remaining)} />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-text-muted">
+                  <span>{traffic.unlimited ? 'Unlimited plan' : `${percent}% used`}</span>
+                  {traffic.exceeded && <span className="text-danger font-medium">Traffic exceeded</span>}
                 </div>
-              ) : (
-                <Button size="sm" variant="secondary" onClick={() => setConfirmReset(true)}>
-                  Reset traffic
-                </Button>
+                <ProgressBar percent={percent} unlimited={traffic.unlimited} />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={unlimited}
+                  onChange={(e) => setUnlimited(e.target.checked)}
+                  className="accent-accent w-4 h-4 cursor-pointer"
+                />
+                Unlimited traffic
+              </label>
+              {!unlimited && (
+                <Input
+                  label="Traffic limit (GB)"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={limitGb}
+                  onChange={(e) => setLimitGb(e.target.value)}
+                  placeholder="e.g. 100"
+                />
               )}
-              <Button loading={limitMutation.isPending} onClick={saveLimit}>
-                Change limit
+            </>
+          ) : null}
+        </div>
+
+        {/* Time settings */}
+        <div className="space-y-2.5">
+          <SectionLabel>Time settings</SectionLabel>
+          <Input
+            label="Expires at"
+            type="datetime-local"
+            value={expiry}
+            onChange={(e) => setExpiry(e.target.value)}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="border-t border-border pt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {confirmReset ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-muted">Reset used traffic?</span>
+                <Button size="sm" variant="danger" loading={resetMutation.isPending} onClick={() => resetMutation.mutate()}>
+                  Confirm
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="secondary" disabled={busy || !traffic} onClick={() => setConfirmReset(true)}>
+                Reset traffic
               </Button>
-            </div>
+            )}
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-muted">Delete user?</span>
+                <Button size="sm" variant="danger" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+                  Confirm
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+              </div>
+            ) : (
+              !confirmReset && (
+                <Button size="sm" variant="danger" disabled={busy} onClick={() => setConfirmDelete(true)}>
+                  <TrashIcon className="w-3.5 h-3.5" />
+                  Delete user
+                </Button>
+              )
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button loading={saveMutation.isPending} disabled={deleteMutation.isPending} onClick={() => saveMutation.mutate()}>
+              Save changes
+            </Button>
           </div>
         </div>
-      ) : null}
+      </div>
     </Modal>
+  )
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+      <span className="text-xs text-text-muted">{label}</span>
+      {children}
+    </div>
   )
 }
