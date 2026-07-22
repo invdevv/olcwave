@@ -1,6 +1,9 @@
+import base64
 import hashlib
 import json
 from fastapi import Response
+
+from config import settings
 from users.schemas import UserSchema
 from olcrtc.sdk import OlcRTC
 from profiles.service import Profiles
@@ -9,10 +12,20 @@ from users.service import Users
 
 import yaml
 import random
+import emoji
 
 class Subscriptions:
     @staticmethod
-    def olcrtc_to_olcbox(configs: list[str], names: list[str]) -> str: 
+    def get_last_emoji(s: str) -> str:
+        matches = list(emoji.emoji_list(s))
+        if not matches:
+            return ""
+
+        last = matches[-1]
+        return last["emoji"]
+
+    @staticmethod
+    def olcrtc_to_olcbox_lbv4(configs: list[str], names: list[str]) -> str: 
         if len(configs) != len(names):
             return "{}"
         locations = []
@@ -27,7 +40,7 @@ class Subscriptions:
             room = cfg.get("room", {}).get("id", "").strip()  # pyright: ignore[reportAny]
             key = cfg.get("crypto", {}).get("key", "").strip()  # pyright: ignore[reportAny]
 
-            storage_id = hashlib.sha1(str(conf).encode()).hexdigest()[:16]
+            storage_id = hashlib.sha1(conf.encode()).hexdigest()[:16]
 
             location = {
                 "storage_id": storage_id,
@@ -126,6 +139,11 @@ class Subscriptions:
         )
 
     @staticmethod
+    def config_to_olcbox_uri(config: str, name: str) -> str:
+        # yeah, uris in olcbox are that format
+        return f"olcrtc://{base64.b64encode(config.encode()).decode()}${name}"
+
+    @staticmethod
     def get_launched_tags(short_uuid: str):
         servers: list[str] = []
         
@@ -136,16 +154,23 @@ class Subscriptions:
         return servers
     
     @staticmethod
-    def prepare_sub_text(uris: list[str], name: str):
+    def prepare_sub_text(uris: list[str], name: str, used: int = 0, available: int = 0):
         txt = (
             f"#name: {name}\n" \
             f"#update: 2147483647\n" \
             f"#refresh: 1h\n" \
+            f"#used: {used}"
+            f"#available: {available}"
             "\n" \
         )
         for uri in uris:
-            txt += f"{uri}\n##name: {uri[uri.find("$")+1:]}\n"
-        
+            name = uri[uri.find("$")+1:]
+            icon = Subscriptions.get_last_emoji(name)
+
+            txt += f"{uri}\n##name: {name}\n"
+            if icon != "":
+                txt += f"##icon: {icon}"
+
         return txt
 
 
@@ -163,8 +188,37 @@ class Subscriptions:
         # Block subscription if traffic limit exceeded
         traffic = await Users.get_traffic(short_uuid)
         if traffic.exceeded:
-            return Response(status_code=403)
+            # string with olcrtc yaml config, for rewrite existing config and say "traffic limit exceeded"
+            olcrtc_fake_valid_config = """mode: cnc
+auth:
+  provider: jitsi
+room:
+  id: "https://example.org"
+crypto:
+  key: "0000000000000000000000000000000000000000000000000000000000000000"
+net:
+  transport: datachannel
+  dns: "0.0.0.0:53"
+"""
 
+            traffic_uri = (
+                f"olcrtc://{base64.b64encode(olcrtc_fake_valid_config.encode()).decode()}"
+                "$Traffic limit Exceeded"
+            )
+
+            return Response(
+                content=Subscriptions.prepare_sub_text(
+                    [traffic_uri],
+                    settings.NAME,
+                    traffic.used,
+                    traffic.limit - traffic.used
+                ),
+                status_code=403,
+                media_type="text/plain",
+                headers={"profile-update-interval": "1"}
+            )
+
+            
         # get configs for servers that already started
         tags = Subscriptions.get_launched_tags(short_uuid)
         configs: dict[str, str] = {tag: OlcRTC.get_config(f"olcwave-{tag}-{short_uuid}").output.decode() for tag in tags}  # pyright: ignore[reportAny]
@@ -187,4 +241,4 @@ class Subscriptions:
         names = [profiles[tag].name for tag in ordered_tags]
         cfgs = [configs[tag] for tag in ordered_tags]
 
-        return Subscriptions.olcrtc_to_olcbox(cfgs, names)
+        return Subscriptions.olcrtc_to_olcbox_lbv4(cfgs, names)

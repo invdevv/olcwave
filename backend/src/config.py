@@ -6,19 +6,27 @@ class Settings(BaseSettings):
     RW_API_URL: str
     RW_API_TOKEN: str
 
-    DB_URL: str
+    DB_HOST: str
+    DB_PORT: int
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    
+    @property
+    def DB_URL(self):
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"
 
-    ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "strong_password_here"
+    ADMIN_USERNAME: str
+    ADMIN_PASSWORD: str
 
-    JWT_SECRET_KEY: str = "change_me"
+    JWT_SECRET_KEY: str
     JWT_EXPIRE_MINUTES: int = 1440
 
-    # Default traffic limit applied to new users, in bytes. 100 GB. Set 0 for unlimited.
-    DEFAULT_TRAFFIC_LIMIT: int = 100 * 1024 * 1024 * 1024
+    # Default traffic limit applied to new users, in bytes. Set 0 for unlimited.
+    DEFAULT_TRAFFIC_LIMIT: int
 
     # Interval (seconds) for the background traffic collection loop.
-    TRAFFIC_COLLECT_INTERVAL: int = 60
+    TRAFFIC_COLLECT_INTERVAL: int
 
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
