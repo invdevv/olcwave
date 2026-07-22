@@ -14,6 +14,6 @@ panel.example.org {
 sub.example.org {
     handle {
         rewrite * /sub{uri}
-        reverse_proxy panel.example.org
+        reverse_proxy api:8000
     }
 }

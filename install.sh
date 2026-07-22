@@ -112,6 +112,15 @@ install_base_packages() {
     success "Base packages installed."
 }
 
+build_olcrtc(){
+  info "Building OLCRTC container"
+  cd backend/olcrtc
+
+  docker build . --tag olcrtc
+
+  cd ../..
+}
+
 # ---------------------------------------------------------------------------
 # 1. Dependency checks and installs
 # ---------------------------------------------------------------------------
@@ -363,6 +372,7 @@ main() {
   write_frontend_env
   write_caddyfile
   build_frontend
+  build_olcrtc
   start_stack
   verify_stack
   print_summary

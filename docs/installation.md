@@ -64,7 +64,17 @@ cd olcwave
 
 ---
 
-# 4. Настройка backend
+# 4. Сборка olcrtc контейнера
+
+```bash
+cd backend/olcrtc
+docker build . --tag olcrtc
+cd ../..
+```
+
+---
+
+# 5. Настройка backend
 
 ```bash
 cp backend/.env.example backend/.env
@@ -92,7 +102,7 @@ JWT_SECRET_KEY=<random string>
 
 ---
 
-# 5. Настройка frontend
+# 6. Настройка frontend
 
 ```bash
 cp frontend/.env.example frontend/.env
@@ -116,7 +126,7 @@ VITE_SUB_URL_TEMPLATE=https://sub.example.org/{uuid}
 
 ---
 
-# 6. Сборка frontend
+# 7. Сборка frontend
 
 Caddy раздает статические файлы из:
 
@@ -135,7 +145,7 @@ cd ..
 
 ---
 
-# 7. Настройка доменов в Caddy
+# 8. Настройка доменов в Caddy
 
 Откройте:
 
@@ -231,7 +241,7 @@ panel.example.org { ... }
 
 ---
 
-# 8. Запуск всего
+# 9. Запуск всего
 
 ```bash
 docker compose up -d

@@ -14,6 +14,6 @@
 {{SUB_DOMAIN}} {
     handle {
         rewrite * /sub{uri}
-        reverse_proxy {{PANEL_DOMAIN}}
+        reverse_proxy api:8000
     }
 }
