@@ -1,37 +1,43 @@
-# Development
+# Разработка
 
-Running OLcWave locally, the project layout, and the rules for contributing.
+Запуск OLcWave локально, структура проекта и правила для внесения изменений.
 
 ## Backend
 
-Python 3.13, FastAPI, SQLAlchemy (async), managed with [uv](https://docs.astral.sh/uv/).
+Python 3.13, FastAPI, SQLAlchemy (async), управление через [uv](https://docs.astral.sh/uv/).
 
-You need a Postgres to talk to. The easiest way is to start just the database with the dev compose file and run the API on your host:
+Вам нужен Postgres для работы. Самый простой способ — запустить только базу данных через dev compose-файл, а API запустить на своем хосте:
 
 ```bash
-# start only Postgres (and optionally the API) from the dev compose
+# запуск только Postgres (и опционально API) из dev compose
 docker compose -f docker-compose-dev.yaml up -d postgres
 ```
 
-Then run the backend:
+Затем запустите backend:
 
 ```bash
 cd backend
-uv sync                      # install dependencies from uv.lock
-# make sure backend/.env has DB_HOST=localhost for host-side runs
-uv run src/main.py           # starts uvicorn on 0.0.0.0:8000
+uv sync                      # установить зависимости из uv.lock
+# убедитесь, что backend/.env содержит DB_HOST=localhost для запуска на хосте
+uv run src/main.py           # запускает uvicorn на 0.0.0.0:8000
 ```
 
-`uv run src/main.py` runs the app defined in `src/main.py` (uvicorn on port 8000). Tables are created on startup. There are no migrations yet — the schema is created directly from the models.
+`uv run src/main.py` запускает приложение, определенное в `src/main.py` (uvicorn на порту 8000).
 
-If you prefer uvicorn with reload:
+Таблицы создаются при запуске.
+
+Миграций пока нет — схема создается напрямую из моделей.
+
+Если вы предпочитаете uvicorn с перезагрузкой:
 
 ```bash
 cd backend
 uv run uvicorn --app-dir src main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-> `backend/.env` uses `DB_HOST=postgres` for Compose. For a host-side run against a local Postgres, set `DB_HOST=localhost`.
+> `backend/.env` использует `DB_HOST=postgres` для Compose. Для запуска на хосте с локальным Postgres установите `DB_HOST=localhost`.
+
+---
 
 ## Frontend
 
@@ -40,135 +46,183 @@ React 19 + Vite + TypeScript + Tailwind.
 ```bash
 cd frontend
 npm install
-npm run dev        # Vite dev server on http://localhost:5173
+npm run dev        # Vite dev server на http://localhost:5173
 ```
 
-Set `frontend/.env`:
+Установите `frontend/.env`:
 
 ```ini
 VITE_API_URL=http://localhost:8000
 VITE_SUB_URL_TEMPLATE=http://localhost:8000/sub/{uuid}
 ```
 
-The backend's default `CORS_ORIGINS` already allow `http://localhost:5173`, so the dev server can call the API directly.
+Значения `CORS_ORIGINS` по умолчанию в backend уже разрешают:
 
-Other scripts:
-
-```bash
-npm run build      # type-check + production build → dist/
-npm run lint       # oxlint
-npm run preview    # serve the built dist/ locally
+```text
+http://localhost:5173
 ```
 
-## Project structure
+поэтому dev-сервер может напрямую обращаться к API.
+
+Другие скрипты:
+
+```bash
+npm run build      # проверка типов + production-сборка → dist/
+npm run lint       # oxlint
+npm run preview    # локальная раздача собранного dist/
+```
+
+---
+
+## Структура проекта
 
 ```
 backend/
   src/
-    main.py            # FastAPI app, router wiring, lifespan (tables + traffic loop)
-    config.py          # env settings (pydantic-settings)
-    database.py        # async engine, session factory, create_tables
-    traffic.py         # background traffic collection + limit enforcement
-    auth/              # admin login, JWT dependency
-    users/             # local user records + traffic (router/service/db/models/schemas)
-    profiles/          # YAML profile templates (router/service/db/models/schemas)
-    olcrtc/            # Docker SDK wrapper + container service/schemas
-    subscriptions/     # subscription generation, config→bundle/URI conversion
+    main.py            # FastAPI app, подключение роутеров, lifespan (таблицы + цикл трафика)
+    config.py          # настройки env (pydantic-settings)
+    database.py        # async engine, фабрика сессий, create_tables
+    traffic.py         # фоновый сбор трафика + применение лимитов
+    auth/              # вход администратора, JWT dependency
+    users/             # локальные записи пользователей + трафик (router/service/db/models/schemas)
+    profiles/          # YAML-шаблоны профилей (router/service/db/models/schemas)
+    olcrtc/            # Docker SDK wrapper + сервис/схемы контейнеров
+    subscriptions/     # генерация подписок, преобразование config→bundle/URI
     rw/                # Remnawave SDK wrapper
-  olcrtc/              # the OLCRTC container image (Dockerfile, entrypoint, Go proxy)
-  Dockerfile           # API image
+  olcrtc/              # образ OLCRTC-контейнера (Dockerfile, entrypoint, Go proxy)
+  Dockerfile           # образ API
 frontend/
   src/
-    api/               # axios clients, one file per resource
-    pages/             # one component per route (Dashboard, Users, Profiles, ...)
-    components/        # ui/ (primitives), layout/, containers/, common/
+    api/               # axios-клиенты, один файл на ресурс
+    pages/             # один компонент на маршрут (Dashboard, Users, Profiles, ...)
+    components/        # ui/ (примитивы), layout/, containers/, common/
     store/             # zustand auth store
-    router/            # route table
-    types/             # shared TypeScript types
-    utils/             # formatting + hooks
-caddy/Caddyfile        # reverse proxy config
+    router/            # таблица маршрутов
+    types/             # общие TypeScript-типы
+    utils/             # форматирование + хуки
+caddy/Caddyfile        # конфигурация reverse proxy
 docker-compose.yaml    # prod: caddy + api + postgres
 docker-compose-dev.yaml# dev: api + postgres
 ```
 
-Each backend module follows the same layering:
+Каждый backend-модуль использует одинаковое разделение слоев:
 
-- `router.py` — HTTP endpoints (thin, auth-guarded).
-- `service.py` — business logic, orchestration.
-- `db.py` — database queries.
-- `models.py` — SQLAlchemy tables.
-- `schemas.py` — Pydantic request/response models.
-
-### Where to add things
-
-- **New API endpoint** → add a route in the relevant `router.py`, put logic in `service.py`, queries in `db.py`. Register new routers in `backend/src/main.py`.
-- **New page** → add a component in `frontend/src/pages/`, register it in `frontend/src/router/index.tsx`, and add a nav entry in `frontend/src/components/layout/Sidebar.tsx`.
-- **New API call from the frontend** → add a method to the matching client in `frontend/src/api/`, and a type in `frontend/src/types/index.ts`.
-- **New reusable UI** → `frontend/src/components/ui/`.
+* `router.py` — HTTP endpoints (тонкий слой, с проверкой авторизации).
+* `service.py` — бизнес-логика, оркестрация.
+* `db.py` — запросы к базе данных.
+* `models.py` — таблицы SQLAlchemy.
+* `schemas.py` — модели запросов/ответов Pydantic.
 
 ---
 
-## Development workflow and AI usage rules
+## Куда добавлять новые элементы
 
-This is an internal working agreement for OLcWave contributors. Read it before you touch the code.
+* **Новый API endpoint** → добавьте route в соответствующий `router.py`, логику разместите в `service.py`, запросы в `db.py`. Новые роутеры зарегистрируйте в `backend/src/main.py`.
 
-### Backend — write it by hand
+* **Новая страница** → добавьте компонент в `frontend/src/pages/`, зарегистрируйте его в `frontend/src/router/index.tsx` и добавьте пункт навигации в `frontend/src/components/layout/Sidebar.tsx`.
 
-The backend must be developed **manually**. Do **not** use AI coding agents to generate backend implementation.
+* **Новый API-вызов из frontend** → добавьте метод в соответствующий клиент в `frontend/src/api/`, а тип — в `frontend/src/types/index.ts`.
 
-That covers everything under `backend/src/` written in:
+* **Новый переиспользуемый UI-компонент** → `frontend/src/components/ui/`.
 
-- Python
-- FastAPI
-- SQLAlchemy
-- Pydantic
-- business logic
-- Docker integration
-- external integrations (Remnawave, etc.)
+---
 
-**Why:** the backend holds the security-sensitive parts — authentication, user management, container control (which is effectively host root via the Docker socket), and traffic enforcement. This code must be written by a developer who fully understands what every line does. A subtle mistake here is a security or billing problem, not a cosmetic bug.
+# Процесс разработки и правила использования AI
 
-You **may** still use AI for:
+Это внутреннее соглашение для участников разработки OLcWave. Прочитайте его перед изменением кода.
 
-- reading library documentation
-- searching for solutions / approaches
-- explaining an error message
-- reviewing code you already wrote
+---
 
-You **may not** use AI to generate the backend implementation itself.
+## Backend
 
-### Frontend — AI is allowed
+Backend должен разрабатываться **осознанно**.
 
-AI coding agents are fine for the frontend.
+**Не используйте AI coding agents для генерации реализации backend.**
 
-**Why:** the frontend is mostly UI — components, pages, forms, tables, and data display. There's no secret and no privileged operation in the browser; the backend enforces everything.
+Это включает всё внутри:
 
-AI is fine for:
+```text
+backend/src/
+```
 
-- writing React components
-- styling (Tailwind / CSS)
-- refactoring UI
-- generating repetitive code (tables, forms, list views)
+написанное с использованием:
 
-**But every change must be reviewed by a developer before it's merged.** AI output that isn't understood doesn't get committed.
+* Python
+* FastAPI
+* SQLAlchemy
+* Pydantic
+* бизнес-логики
+* интеграции с Docker
+* внешних интеграций (Remnawave и т.д.)
 
-### Documentation — AI is allowed
+**Почему:** backend содержит части, связанные с безопасностью:
 
-You may use AI to help with docs.
+* аутентификация;
+* управление пользователями;
+* управление контейнерами (что фактически является root-доступом к хосту через Docker socket);
+* контроль трафика.
 
-AI is fine for:
+Этот код должен писаться разработчиком, который полностью понимает каждую строку
 
-- drafting README / guides
-- describing architecture
-- writing examples
-- improving wording
+Вы **можете использовать AI для:**
 
-**But the docs must be checked by hand and must match the real state of the code.** Documentation that describes features that don't exist is worse than no documentation.
+* чтения документации библиотек;
+* поиска решений / подходов;
+* объяснения сообщений об ошибках;
+* ревью уже написанного вами кода.
 
-### Summary
+Вы **не можете использовать AI для генерации самой реализации backend.**
 
-| Part of the project | AI agents | Rule |
-|---------------------|-----------|------|
-| Backend | No | Write by hand |
-| Frontend | Yes | Review every change |
-| Documentation | Yes | Verify it matches the code |
+---
+
+## Frontend — AI разрешен
+
+AI coding agents разрешены для frontend.
+
+**Почему:** frontend в основном представляет собой UI:
+
+* компоненты;
+* страницы;
+* формы;
+* таблицы;
+* отображение данных.
+
+В браузере нет секретов и привилегированных операций — backend контролирует всё.
+
+AI можно использовать для:
+
+* написания React-компонентов;
+* стилизации (Tailwind / CSS);
+* рефакторинга UI;
+* генерации повторяющегося кода (таблицы, формы, списки).
+
+**Но каждое изменение должно быть проверено разработчиком перед слиянием.**
+
+Код, сгенерированный AI и не понятый разработчиком, не должен попадать в commit.
+
+---
+
+## Документация — AI разрешен
+
+AI можно использовать для помощи с документацией.
+
+AI подходит для:
+
+* создания черновиков README / руководств;
+* описания архитектуры;
+* написания примеров;
+* улучшения формулировок.
+
+**Но документация должна проверяться вручную и соответствовать реальному состоянию кода.**
+
+Документация, описывающая несуществующие возможности, хуже, чем отсутствие документации.
+
+---
+
+## Итог
+
+| Часть проекта | AI agents | Правило                     |
+| ------------- | --------- | --------------------------- |
+| Backend       | Нет       | Писать вручную              |
+| Frontend      | Да        | Проверять каждое изменение  |
+| Documentation | Да        | Проверять соответствие коду |

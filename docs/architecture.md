@@ -1,60 +1,68 @@
-# Architecture
+# Архитектура
 
-How the pieces fit together, and what actually happens on each request.
+Как части системы взаимодействуют между собой и что фактически происходит при каждом запросе.
 
-## Components
+## Компоненты
 
-| Component | Container | Role |
-|-----------|-----------|------|
-| Frontend | (none — static files served by Caddy) | React SPA, admin UI |
-| Backend | `olcwave-api` | FastAPI. All logic. Talks to Postgres, Remnawave, and the Docker socket. |
-| Database | `olcwave-postgres` | PostgreSQL 16. Users + profiles + traffic counters. |
-| Reverse proxy | `olcwave-caddy` | Serves the SPA, proxies API, terminates HTTPS. |
-| OLCRTC | `olcwave-<tag>-<uuid>` | One per (profile, user). The actual transport + a stats-writing SOCKS proxy. |
+| Компонент     | Контейнер                                     | Назначение                                                                                          |
+| ------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Frontend      | (нет — статические файлы обслуживаются Caddy) | React SPA, административный интерфейс                                                               |
+| Backend       | `olcwave-api`                                 | FastAPI. Вся логика. Взаимодействует с Postgres, Remnawave и Docker socket.                         |
+| Database      | `olcwave-postgres`                            | PostgreSQL 16. Пользователи + профили + счетчики трафика.                                           |
+| Reverse proxy | `olcwave-caddy`                               | Обслуживает SPA, проксирует API, завершает HTTPS.                                                   |
+| OLCRTC        | `olcwave-<tag>-<uuid>`                        | Один на пару (профиль, пользователь). Фактический transport + SOCKS proxy, записывающий статистику. |
 
-The API container mounts `/var/run/docker.sock`, so it drives the host's Docker daemon directly — that's how it builds the `olcrtc` image and starts/stops OLCRTC containers.
+API-контейнер монтирует `/var/run/docker.sock`, поэтому он напрямую управляет Docker daemon хоста — именно так он собирает образ `olcrtc` и запускает/останавливает OLCRTC-контейнеры.
 
-## Data model
+## Модель данных
 
-Two tables, created automatically on backend startup (`create_tables`, no Alembic yet).
+Две таблицы, создаваемые автоматически при запуске backend (`create_tables`, пока без Alembic).
 
 **users**
-- `short_uuid` — the Remnawave short UUID, unique. This is the link between a subscriber and their local record.
-- `created_at`, `expires_at` — expiry mirrored from Remnawave at first sight.
-- `traffic_limit_bytes` — `0` means unlimited.
-- `traffic_used_bytes` — accumulated by the traffic loop.
+
+* `short_uuid` — короткий UUID Remnawave, уникальный. Это связь между подписчиком и его локальной записью.
+* `created_at`, `expires_at` — срок действия, скопированный из Remnawave при первом обнаружении.
+* `traffic_limit_bytes` — `0` означает безлимит.
+* `traffic_used_bytes` — накапливается циклом учета трафика.
 
 **profiles**
-- `name`, `tag` (unique), `profile` (YAML template).
 
-Note: users are created **lazily**. There's no "add user" button — a local user row appears the first time a valid subscription is requested for that UUID.
+* `name`, `tag` (уникальный), `profile` (YAML-шаблон).
 
-## The main flow: a subscription request
+Примечание: пользователи создаются **лениво**. Нет кнопки "add user" — локальная запись пользователя появляется при первом запросе действительной подписки для этого UUID.
 
-This is the heart of the system. When a client hits `GET /sub/{short_uuid}` (`Subscriptions.get`):
+## Основной поток: запрос подписки
+
+Это сердце системы. Когда клиент обращается к:
 
 ```
-1. Ask Remnawave: is this short_uuid valid?
-      └─ no  → 404, nothing happens.
-      └─ yes → continue.
-
-2. Do we have a local user row for it?
-      └─ no  → create one (expiry from Remnawave, default traffic limit).
-
-3. Check traffic:
-      └─ exceeded → return a "Traffic limit Exceeded" placeholder config, HTTP 403.
-
-4. Which of this user's containers are already running?
-      └─ read their live config.yaml.
-
-5. For every profile that has no container for this user yet:
-      └─ generate a fresh config (random crypto.key, room name)
-      └─ run a new container  olcwave-<tag>-<short_uuid>
-
-6. Build an OLCBox v5 bundle from every profile's config and return it.
+GET /sub/{short_uuid}
 ```
 
-So the first time a user opens their link, their containers spin up on demand. Subsequent fetches reuse the running ones.
+(`Subscriptions.get`):
+
+```
+1. Запросить Remnawave: является ли этот short_uuid действительным?
+      └─ нет  → 404, ничего не происходит.
+      └─ да   → продолжить.
+
+2. Есть ли для него локальная запись пользователя?
+      └─ нет  → создать одну (срок действия из Remnawave, лимит трафика по умолчанию).
+
+3. Проверить трафик:
+      └─ превышен → вернуть placeholder-конфигурацию "Traffic limit Exceeded", HTTP 403.
+
+4. Какие контейнеры этого пользователя уже запущены?
+      └─ прочитать их текущий config.yaml.
+
+5. Для каждого профиля, для которого еще нет контейнера этого пользователя:
+      └─ сгенерировать новый config (случайный crypto.key, имя комнаты)
+      └─ запустить новый контейнер olcwave-<tag>-<short_uuid>
+
+6. Создать OLCBox v5 bundle из конфигурации каждого профиля и вернуть его.
+```
+
+Таким образом, при первом открытии пользователем своей ссылки его контейнеры запускаются по требованию. Последующие запросы используют уже запущенные контейнеры.
 
 ```
 Client ──GET /sub/{uuid}──► Backend ──validate──► Remnawave
@@ -66,49 +74,51 @@ Client ──GET /sub/{uuid}──► Backend ──validate──► Remnawave
                                └─ return OLCBox bundle
 ```
 
-### Subscription output formats
+### Форматы вывода подписки
 
-The code can render configs two ways:
+Код может отображать конфигурации двумя способами:
 
-- **OLCBox v5 bundle** (`olcrtc_to_olcbox_lbv4`) — a JSON object with `version: 5`, an `active_location_id`, and a `locations` array. This is what `GET /sub/{uuid}` returns. The panel's Subscriptions page renders this bundle.
-- **Compact `olcrtc://` URIs** (`config_to_uri`, `config_to_olcbox_uri`) — single-line URIs, used to build human-readable subscription text with `#name` / `##icon` headers.
+* **OLCBox v5 bundle** (`olcrtc_to_olcbox_lbv4`) — JSON-объект с `version: 5`, `active_location_id` и массивом `locations`. Именно это возвращает `GET /sub/{uuid}`. Страница Subscriptions панели отображает этот bundle.
+* **Компактные `olcrtc://` URI** (`config_to_uri`, `config_to_olcbox_uri`) — однострочные URI, используемые для создания человекочитаемого текста подписки с заголовками `#name` / `##icon`.
 
-## Containers
+## Контейнеры
 
-### Lifecycle
+### Жизненный цикл
 
-The panel manages containers through the Docker SDK (`backend/src/olcrtc/sdk.py`):
+Панель управляет контейнерами через Docker SDK:
 
-| Action | What it does |
-|--------|--------------|
-| **build** | Builds the `olcrtc` image from `backend/olcrtc/` if it doesn't exist yet (or force-rebuild). |
-| **run** | Removes any old container with the same name, then `docker run` detached with the generated config passed as the `CONFIG` env var. Named `olcwave-<tag>-<uuid>`. |
-| **start** | Start an existing stopped container. |
-| **stop** | Stop a running container. |
-| **restart** | Restart it. |
-| **remove** | Force-remove it. |
-| **logs** | `docker logs` output. |
-| **config** | `cat /tmp/olcwave/config.yaml` inside the container — the exact config it's running. |
-| **stats** | `cat /var/lib/olcwave/stats.json` inside the container — byte counters. |
+`backend/src/olcrtc/sdk.py`
 
-The Containers page in the UI exposes start/stop/restart, logs, config, and live per-container stats (total, up/down bytes, up/down speed, uptime), grouped by user or by config tag.
+| Действие    | Что оно делает                                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **build**   | Собирает образ `olcrtc` из `backend/olcrtc/`, если он еще не существует (или выполняет принудительную пересборку).                                                                                            |
+| **run**     | Удаляет любой старый контейнер с таким же именем, затем выполняет `docker run` в detached-режиме с переданной через переменную окружения `CONFIG` сгенерированной конфигурацией. Имя: `olcwave-<tag>-<uuid>`. |
+| **start**   | Запускает существующий остановленный контейнер.                                                                                                                                                               |
+| **stop**    | Останавливает работающий контейнер.                                                                                                                                                                           |
+| **restart** | Перезапускает его.                                                                                                                                                                                            |
+| **remove**  | Принудительно удаляет его.                                                                                                                                                                                    |
+| **logs**    | Вывод `docker logs`.                                                                                                                                                                                          |
+| **config**  | `cat /tmp/olcwave/config.yaml` внутри контейнера — точная конфигурация, с которой он работает.                                                                                                                |
+| **stats**   | `cat /var/lib/olcwave/stats.json` внутри контейнера — счетчики байтов.                                                                                                                                        |
 
-### What's inside an OLCRTC container
+Страница Containers в UI предоставляет запуск/остановку/перезапуск, логи, конфигурацию и live-статистику каждого контейнера (общий объем, входящие/исходящие байты, скорость загрузки/выгрузки, время работы), сгруппированные по пользователю или по config tag.
 
-Built from `backend/olcrtc/Dockerfile`. Two processes, started by `entrypoint.sh`:
+### Что находится внутри OLCRTC-контейнера
 
-1. **olcrtc** — cloned and built from the upstream [openlibrecommunity/olcrtc](https://github.com/openlibrecommunity/olcrtc) repo. Runs `/tmp/olcwave/config.yaml`.
-2. **proxy** — a small Go SOCKS5 proxy (`proxy.go`). OLCRTC is pointed at it via an appended `socks:` block. Every byte through the proxy is counted and flushed to `stats.json` once a second (atomic write).
+Собирается из `backend/olcrtc/Dockerfile`. Два процесса, запускаемые через `entrypoint.sh`:
 
-The entrypoint writes the `CONFIG` env var to `config.yaml`, appends the `socks:` block, launches the proxy, then launches olcrtc, and tears down the proxy when olcrtc exits.
+1. **olcrtc** — клонируется и собирается из upstream-репозитория [openlibrecommunity/olcrtc](https://github.com/openlibrecommunity/olcrtc). Запускается с `/tmp/olcwave/config.yaml`.
+2. **proxy** — небольшой Go SOCKS5 proxy (`proxy.go`). OLCRTC подключается к нему через добавленный блок `socks:`. Каждый байт через proxy подсчитывается и раз в секунду записывается в `stats.json` (атомарная запись).
 
-## Traffic system
+Entry point записывает переменную окружения `CONFIG` в `config.yaml`, добавляет блок `socks:`, запускает proxy, затем запускает olcrtc и завершает proxy после выхода olcrtc.
 
-Traffic is measured by the SOCKS proxy, aggregated by the backend.
+## Система трафика
 
-### Inside the container: `stats.json`
+Трафик измеряется SOCKS proxy и агрегируется backend.
 
-`proxy.go` wraps every accepted connection in a counting reader/writer. It periodically writes `/var/lib/olcwave/stats.json`:
+### Внутри контейнера: `stats.json`
+
+`proxy.go` оборачивает каждое принятое соединение в counting reader/writer. Он периодически записывает `/var/lib/olcwave/stats.json`:
 
 ```json
 {
@@ -124,41 +134,41 @@ Traffic is measured by the SOCKS proxy, aggregated by the backend.
 }
 ```
 
-`total_bytes` = upload + download. This resets to 0 whenever the container restarts.
+`total_bytes` = upload + download. Это значение сбрасывается в 0 при каждом перезапуске контейнера.
 
-### In the backend: the collection loop
+### В backend: цикл сбора данных
 
-`TrafficManager` runs in the FastAPI lifespan, every `TRAFFIC_COLLECT_INTERVAL` seconds:
+`TrafficManager` запускается в FastAPI lifespan каждые `TRAFFIC_COLLECT_INTERVAL` секунд:
 
-1. For each running `olcwave-*` container, read `stats.json` and take `total_bytes`.
-2. Compute the **delta** since last tick. (If the counter went down — container restarted — treat the new total as the delta, so restarts don't undercount.)
-3. Add the delta to the owning user's `traffic_used_bytes` in Postgres. The owner is parsed from the container name (`olcwave-<tag>-<owner>`).
-4. If the user is now over their limit, **stop all of that user's containers**.
+1. Для каждого работающего контейнера `olcwave-*` прочитать `stats.json` и получить `total_bytes`.
+2. Вычислить **delta** с момента последнего тика. (Если счетчик уменьшился — контейнер был перезапущен — новый total считается delta, чтобы рестарты не приводили к недоучету.)
+3. Добавить delta к `traffic_used_bytes` владельца пользователя в Postgres. Владелец определяется из имени контейнера (`olcwave-<tag>-<owner>`).
+4. Если пользователь теперь превысил свой лимит, **остановить все контейнеры этого пользователя**.
 
-Forgotten containers (that no longer exist) are dropped from the in-memory "last totals" map so a future container with the same name starts clean.
+Забытые контейнеры (которых больше не существует) удаляются из внутренней карты "last totals", чтобы будущий контейнер с таким же именем начинал учет с чистого состояния.
 
-### Enforcement
+### Контроль ограничений
 
-- **Over limit** → the loop stops the user's containers. Trying to start a container for an over-limit user via `POST /containers/run` returns `403 traffic_limit_exceeded`.
-- **Subscription while over limit** → `GET /sub/{uuid}` returns a placeholder config named "Traffic limit Exceeded" with HTTP 403, so the client sees the reason instead of a broken connection.
+* **Превышение лимита** → цикл останавливает контейнеры пользователя. Попытка запустить контейнер для пользователя с превышенным лимитом через `POST /containers/run` возвращает `403 traffic_limit_exceeded`.
+* **Подписка при превышенном лимите** → `GET /sub/{uuid}` возвращает placeholder-конфигурацию с именем "Traffic limit Exceeded" и HTTP 403, поэтому клиент видит причину вместо неработающего подключения.
 
-### Limit fields
+### Поля лимитов
 
-Per user (see `TrafficInfoSchema`):
+Для пользователя (см. `TrafficInfoSchema`):
 
-- `limit` — `traffic_limit_bytes`; `0` = unlimited.
-- `used` — `traffic_used_bytes`.
-- `remaining` — `max(0, limit - used)` (0 when unlimited).
-- `unlimited` — `limit == 0`.
-- `exceeded` — not unlimited **and** `used >= limit`.
+* `limit` — `traffic_limit_bytes`; `0` = безлимит.
+* `used` — `traffic_used_bytes`.
+* `remaining` — `max(0, limit - used)` (0 при безлимитном режиме).
+* `unlimited` — `limit == 0`.
+* `exceeded` — не безлимитный **и** `used >= limit`.
 
-### Reset
+### Сброс
 
-`POST /users/traffic/reset` (a button in the user edit modal) sets `traffic_used_bytes` back to 0. Combined with editing the limit or expiry, this is how you "renew" a user. Note the in-container counter isn't reset — the loop's delta logic handles that on the next tick.
+`POST /users/traffic/reset` (кнопка в модальном окне редактирования пользователя) устанавливает `traffic_used_bytes` обратно в 0. Вместе с изменением лимита или срока действия это используется для "продления" пользователя. Обратите внимание: счетчик внутри контейнера не сбрасывается — логика delta обработает это при следующем тике.
 
 ## Caddy
 
-Caddy is the only thing exposed to the internet. It does three jobs from `caddy/Caddyfile`:
+Caddy — единственный компонент, доступный из интернета. Он выполняет три задачи из `caddy/Caddyfile`:
 
 ```caddyfile
 panel.example.org {
@@ -180,8 +190,8 @@ sub.example.org {
 }
 ```
 
-- **reverse_proxy** — forwards to the `api` service (`api:8000`) inside the Compose network. `handle_path` strips the `/api` prefix, so the browser calls `https://panel.example.org/api/auth/login` and the backend receives `/auth/login`. That's why `VITE_API_URL` ends in `/api`. The frontend `dist` is bind-mounted read-only into the Caddy container at `/srv/frontend/dist`.
-- **HTTPS / certificates / SSL** — Caddy automatically obtains and renews Let's Encrypt certificates for any real domain you configure. The Compose file publishes ports **80** and **443**, which is what it needs; the domain's DNS must point at the server.
-- **SPA routing** — `try_files {path} /index.html` makes client-side routes (like `/users`) load the SPA instead of 404ing.
+* **reverse_proxy** — пересылает запросы в сервис `api` (`api:8000`) внутри Compose network. `handle_path` удаляет префикс `/api`, поэтому браузер вызывает `https://panel.example.org/api/auth/login`, а backend получает `/auth/login`. Поэтому `VITE_API_URL` заканчивается на `/api`. Frontend `dist` монтируется только для чтения в контейнер Caddy по пути `/srv/frontend/dist`.
+* **HTTPS / certificates / SSL** — Caddy автоматически получает и обновляет сертификаты Let's Encrypt для любого настроенного реального домена. Compose-файл публикует порты **80** и **443**, которые ему необходимы; DNS домена должен указывать на сервер.
+* **SPA routing** — `try_files {path} /index.html` позволяет клиентским маршрутам (например `/users`) загружать SPA вместо получения ошибки 404.
 
-For a local, cert-free setup use a plain-port site block (e.g. `:80 { ... }`) instead of a domain, and Caddy serves over HTTP without certificates.
+Для локальной настройки без сертификатов используйте обычный site block с портом (например, `:80 { ... }`) вместо домена, и Caddy будет обслуживать HTTP без сертификатов.

@@ -1,48 +1,53 @@
 # API
 
-The backend is a FastAPI app. Interactive docs are always available at `/docs` (Swagger) and `/redoc` on the running API.
+Бэкенд — это приложение на FastAPI. Интерактивная документация всегда доступна по адресам `/docs` (Swagger) и `/redoc` на запущенном API.
 
-Base URL: whatever `VITE_API_URL` points at (e.g. `http://localhost:8000` in dev). Routes below are relative to it. The backend itself serves routes with **no `/api` prefix** — in production Caddy exposes them under `/api/*` and strips the prefix before forwarding, which is why `VITE_API_URL` ends in `/api` there.
+Базовый URL: то, на что указывает `VITE_API_URL` (например, `http://localhost:8000` в dev). Ниже маршруты указаны относительно него. Сам бэкенд обслуживает маршруты **без префикса `/api`** — в production Caddy публикует их под `/api/*` и удаляет префикс перед проксированием, поэтому в production `VITE_API_URL` оканчивается на `/api`.
 
 ## Auth
 
-All endpoints except `POST /auth/login` and `GET /sub/{short_uuid}` require a bearer token:
+Все эндпоинты, кроме `POST /auth/login` и `GET /sub/{short_uuid}`, требуют bearer-токен:
 
 ```
 Authorization: Bearer <token>
 ```
 
-The token is a JWT signed with `JWT_SECRET_KEY`, valid for `JWT_EXPIRE_MINUTES`. A `401` clears the token in the frontend and redirects to login.
+Токен — это JWT, подписанный `JWT_SECRET_KEY`, действительный в течение `JWT_EXPIRE_MINUTES`. Ответ `401` очищает токен во фронтенде и перенаправляет на страницу входа.
 
 ### `POST /auth/login`
 
-Log in as the admin. There is exactly one admin (from `ADMIN_USERNAME` / `ADMIN_PASSWORD`).
+Войти как администратор. Администратор ровно один (из `ADMIN_USERNAME` / `ADMIN_PASSWORD`).
 
-**Request**
+**Запрос**
+
 ```json
 { "username": "admin", "password": "your-password" }
 ```
 
-**Response** `200`
+**Ответ** `200`
+
 ```json
 { "access_token": "eyJhbGciOi...", "token_type": "bearer" }
 ```
 
-`401` on bad credentials.
+`401` — при неверных учетных данных.
 
 ---
 
 ## Users
 
-Local user records (traffic + expiry). `short_uuid` is the Remnawave short UUID.
+Локальные записи пользователей (трафик + срок действия). `short_uuid` — это короткий UUID Remnawave.
 
 ### `GET /users/all?tag=`
-List all users. (`tag` query param is required by the signature but unused — pass `?tag=`.)
+
+Список всех пользователей. (`tag` в строке запроса обязателен по сигнатуре, но не используется — передавайте `?tag=`.)
 
 ### `GET /users/?short_uuid=<uuid>`
-One user. `404` if not found.
 
-**Response** (`UserSchema`)
+Один пользователь. `404`, если не найден.
+
+**Ответ** (`UserSchema`)
+
 ```json
 {
   "short_uuid": "rfWMHbDFsH_cPXRz",
@@ -54,13 +59,16 @@ One user. `404` if not found.
 ```
 
 ### `PUT /users/?short_uuid=<uuid>&expires_at=<iso8601>`
-Update a user's expiry. Parameters are query params.
+
+Обновить срок действия пользователя. Параметры передаются в query string.
 
 ### `DELETE /users/?short_uuid=<uuid>`
-Delete a user.
+
+Удалить пользователя.
 
 ### `GET /users/traffic?short_uuid=<uuid>`
-Traffic info (`TrafficInfoSchema`).
+
+Информация о трафике (`TrafficInfoSchema`).
 
 ```json
 {
@@ -74,56 +82,67 @@ Traffic info (`TrafficInfoSchema`).
 ```
 
 ### `PATCH /users/traffic?short_uuid=<uuid>`
-Set the traffic limit. `0` = unlimited.
 
-**Request**
+Установить лимит трафика. `0` = безлимит.
+
+**Запрос**
+
 ```json
 { "traffic_limit_bytes": 214748364800 }
 ```
 
-Returns the updated `TrafficInfoSchema`.
+Возвращает обновленный `TrafficInfoSchema`.
 
 ### `POST /users/traffic/reset?short_uuid=<uuid>`
-Reset `used` to 0. Returns the updated `TrafficInfoSchema`.
+
+Сбросить `used` до 0. Возвращает обновленный `TrafficInfoSchema`.
 
 ---
 
 ## Profiles
 
-OLCRTC YAML templates. See [profiles.md](profiles.md).
+Шаблоны OLCRTC YAML. См. [profiles.md](profiles.md).
 
 ### `GET /profiles/all?tag=`
-List all profiles. (`tag` param required by signature, unused.)
+
+Список всех профилей. (`tag` обязателен по сигнатуре, но не используется.)
 
 ### `GET /profiles/?tag=<tag>`
-One profile by tag. `404` if not found.
+
+Один профиль по тегу. `404`, если не найден.
 
 ### `POST /profiles/`
-Create a profile. YAML is validated (must parse).
 
-**Request** (`ProfileSchema`)
+Создать профиль. YAML валидируется (должен корректно парситься).
+
+**Запрос** (`ProfileSchema`)
+
 ```json
 { "name": "Germany VP8", "tag": "de-vp8", "profile": "mode: cnc\nauth:\n  provider: jitsi\n..." }
 ```
 
-Returns `"ok"`.
+Возвращает `"ok"`.
 
 ### `PUT /profiles/?tag=<tag>&name=<name>&profile=<yaml>`
-Update a profile's name and YAML. Parameters are query params. **Side effect:** stops every container whose name contains `<tag>`.
+
+Обновить имя профиля и YAML. Параметры передаются в query string. **Побочный эффект:** останавливает все контейнеры, имя которых содержит `<tag>`.
 
 ### `DELETE /profiles/?tag=<tag>`
-Delete a profile. **Side effect:** stops and removes every container whose name contains `<tag>`.
+
+Удалить профиль. **Побочный эффект:** останавливает и удаляет все контейнеры, имя которых содержит `<tag>`.
 
 ---
 
 ## Containers
 
-Docker containers named `olcwave-<config_tag>-<user_id>`.
+Docker-контейнеры с именами `olcwave-<config_tag>-<user_id>`.
 
 ### `GET /containers/all`
-All panel containers (running and stopped).
 
-**Response** (list of `ContainerSchema`)
+Все контейнеры панели (запущенные и остановленные).
+
+**Ответ** (список `ContainerSchema`)
+
 ```json
 [
   {
@@ -139,25 +158,32 @@ All panel containers (running and stopped).
 ```
 
 ### `POST /containers/run?name=<name>`
-Start a container. Returns `403 traffic_limit_exceeded` if the owning user is over their limit.
+
+Запустить контейнер. Возвращает `403 traffic_limit_exceeded`, если у владельца пользователя превышен лимит.
 
 ### `POST /containers/stop?name=<name>`
-Stop a container.
+
+Остановить контейнер.
 
 ### `POST /containers/restart?name=<name>`
-Restart a container.
+
+Перезапустить контейнер.
 
 ### `DELETE /containers/?name=<name>`
-Force-remove a container.
+
+Принудительно удалить контейнер.
 
 ### `GET /containers/logs?name=<name>`
-`{ "name": "...", "logs": "..." }` — the container's stdout/stderr.
+
+`{ "name": "...", "logs": "..." }` — stdout/stderr контейнера.
 
 ### `GET /containers/config?name=<name>`
-`{ "name": "...", "config": "..." }` — the `config.yaml` the container is running.
+
+`{ "name": "...", "config": "..." }` — `config.yaml`, с которым работает контейнер.
 
 ### `GET /containers/stats?name=<name>`
-Live byte counters (`ContainerStatsSchema`).
+
+Живые счетчики байтов (`ContainerStatsSchema`).
 
 ```json
 {
@@ -175,13 +201,14 @@ Live byte counters (`ContainerStatsSchema`).
 ## Subscriptions (public)
 
 ### `GET /sub/{short_uuid}`
-The public subscription endpoint. **No auth.** This is what a subscriber's client fetches.
 
-Behavior (see [architecture.md](architecture.md)):
+Публичный эндпоинт подписки. **Без авторизации.** Именно его запрашивает клиент подписчика.
 
-- Validates the UUID against Remnawave. `404` if unknown.
-- Auto-creates a local user row on first sight.
-- If the user is over their traffic limit → returns a "Traffic limit Exceeded" placeholder config with HTTP `403`.
-- Otherwise launches any missing containers for the user and returns an **OLCBox v5 bundle** (JSON) of all their locations.
+Поведение (см. [architecture.md](architecture.md)):
 
-The response carries a `profile-update-interval` header so clients know how often to refresh.
+* Проверяет UUID в Remnawave. `404`, если UUID неизвестен.
+* При первом обращении автоматически создает локальную запись пользователя.
+* Если у пользователя превышен лимит трафика → возвращает заглушку конфигурации "Traffic limit Exceeded" с HTTP `403`.
+* Иначе запускает все отсутствующие контейнеры для пользователя и возвращает bundle **OLCBox v5** (JSON) со всеми его локациями.
+
+В ответе присутствует заголовок `profile-update-interval`, чтобы клиенты знали, как часто обновляться.

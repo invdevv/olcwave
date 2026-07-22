@@ -1,38 +1,50 @@
-# Installation
+# Установка
 
-This walks through a full deployment on a fresh Linux server. By the end you'll have the panel running behind Caddy with your own domains.
+## Что потребуется
 
-## What you need
+* Linux-сервер (любой современный дистрибутив). Примеры ниже используют `apt` для Debian/Ubuntu.
+* **Docker** и **плагин Docker Compose**.
+* **Node.js 20+ / npm** — frontend собирается на хосте, а не внутри Docker.
+* Рабочий экземпляр **Remnawave** и API-токен для него.
+* Для production: **домен** (два имени, например `panel.example.org` и `sub.example.org`), указывающий на сервер. Caddy автоматически получает для них HTTPS-сертификаты.
 
-- A Linux server (any modern distro). Examples below use Debian/Ubuntu `apt`.
-- **Docker** and the **Docker Compose plugin**.
-- **Node.js 20+ / npm** — the frontend is built on the host, not in Docker.
-- A running **Remnawave** instance and an API token for it.
-- For production: a **domain** (two names, e.g. `panel.example.org` and `sub.example.org`) pointing at the server. Caddy gets HTTPS certificates for them automatically.
+API-контейнер взаимодействует с Docker daemon хоста через:
 
-The API container talks to the host's Docker daemon through `/var/run/docker.sock` — that's how it launches OLCRTC containers. This means the panel effectively has root on the host. Only run it on a server you control.
+```text
+/var/run/docker.sock
+```
 
-## 1. Install Docker
+— именно так он запускает OLCRTC-контейнеры.
+
+Это означает, что панель фактически имеет root-доступ к хосту.
+
+Запускайте ее только на сервере, которым вы управляете.
+
+---
+
+# 1. Установка Docker
 
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo systemctl enable --now docker
 ```
 
-Verify:
+Проверка:
 
 ```bash
 docker --version
 docker compose version
 ```
 
-If you want to run `docker` without `sudo`, add your user to the `docker` group and re-log:
+Если вы хотите запускать `docker` без `sudo`, добавьте пользователя в группу `docker` и войдите заново:
 
 ```bash
 sudo usermod -aG docker "$USER"
 ```
 
-## 2. Install Node.js
+---
+
+# 2. Установка Node.js
 
 ```bash
 # Debian/Ubuntu — NodeSource
@@ -41,46 +53,90 @@ sudo apt-get install -y nodejs
 node --version   # v20+
 ```
 
-## 3. Clone the repo
+---
+
+# 3. Клонирование репозитория
 
 ```bash
 git clone https://github.com/invdevv/olcwave.git
 cd olcwave
 ```
 
-## 4. Configure the backend
+---
+
+# 4. Настройка backend
 
 ```bash
 cp backend/.env.example backend/.env
 nano backend/.env
 ```
 
-Every variable is explained in [configuration.md](configuration.md). The ones you **must** change before first start:
+Все переменные описаны в [configuration.md](configuration.md).
+
+Переменные, которые **обязательно нужно изменить перед первым запуском**:
 
 ```ini
-RW_API_URL=https://your-remnawave-host        # your Remnawave API base URL
-RW_API_TOKEN=...                               # Remnawave API token
+RW_API_URL=https://your-remnawave-host        # базовый URL API Remnawave
+RW_API_TOKEN=...                              # API-токен Remnawave
 POSTGRES_PASSWORD=<something strong>
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<something strong>
 JWT_SECRET_KEY=<random string>
 ```
 
-> Note: `backend/.env` is passed into the API container at runtime via `env_file` in `docker-compose.yaml` (it is **not** baked into the image — it's in `.dockerignore`). If you change it later, just restart the API: `docker compose up -d api`.
+> Примечание: `backend/.env` передается в API-контейнер во время запуска через `env_file` в `docker-compose.yaml` (он **не встраивается в образ** — находится в `.dockerignore`). Если позже изменить файл, достаточно перезапустить API:
+>
+> ```bash
+> docker compose up -d api
+> ```
 
-## 5. Configure Compose (root `.env`)
+---
 
-Docker Compose substitutes `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}` and `${POSTGRES_DB}` in `docker-compose.yaml` from a `.env` file **in the repo root**. This is a separate file from `backend/.env`, and the three Postgres values **must match** what you put in `backend/.env` — otherwise the API and the database won't agree on credentials.
+# 5. Настройка Compose (корневой `.env`)
 
-Create `./.env`:
+Docker Compose подставляет:
+
+```text
+${POSTGRES_USER}
+${POSTGRES_PASSWORD}
+${POSTGRES_DB}
+```
+
+в `docker-compose.yaml` из файла:
+
+```text
+.env
+```
+
+в корне репозитория.
+
+Это отдельный файл от:
+
+```text
+backend/.env
+```
+
+и три значения PostgreSQL **обязательно должны совпадать** со значениями из `backend/.env`.
+
+Иначе API и база данных будут использовать разные учетные данные.
+
+Создайте:
+
+```text
+./.env
+```
+
+Содержимое:
 
 ```ini
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<same strong password as backend/.env>
+POSTGRES_PASSWORD=<тот же надежный пароль, что и в backend/.env>
 POSTGRES_DB=main
 ```
 
-## 6. Configure the frontend
+---
+
+# 6. Настройка frontend
 
 ```bash
 cp frontend/.env.example frontend/.env
@@ -88,35 +144,55 @@ $EDITOR frontend/.env
 ```
 
 ```ini
-# Where the browser reaches the backend API.
-# Caddy serves the SPA and the API under one domain and strips the /api prefix,
-# so point this at <panel-domain>/api:
+# Куда браузер обращается для API backend.
+# Caddy обслуживает SPA и API через один домен и удаляет префикс /api,
+# поэтому здесь указывается <домен панели>/api:
 VITE_API_URL=https://panel.example.org/api
 
-# Subscription link shown/copied in the UI. {uuid} is replaced per user.
+# Ссылка подписки, отображаемая/копируемая в UI.
+# {uuid} заменяется для каждого пользователя.
 VITE_SUB_URL_TEMPLATE=https://sub.example.org/{uuid}
 ```
 
-These values are baked into the built JavaScript at build time (step 7). Change them → rebuild the frontend.
+Эти значения встраиваются в собранный JavaScript во время сборки (шаг 7).
 
-## 7. Build the frontend
+Изменили их → пересоберите frontend.
 
-Caddy serves the static files from `frontend/dist`, so you build them once on the host:
+---
+
+# 7. Сборка frontend
+
+Caddy раздает статические файлы из:
+
+```text
+frontend/dist
+```
+
+поэтому сборка выполняется один раз на хосте:
 
 ```bash
 cd frontend
 npm ci
-npm run build      # outputs frontend/dist
+npm run build      # создает frontend/dist
 cd ..
 ```
 
-## 8. Set up your domains in Caddy
+---
 
-Edit `caddy/Caddyfile` and replace the example domains with yours:
+# 8. Настройка доменов в Caddy
+
+Откройте:
+
+```text
+caddy/Caddyfile
+```
+
+и замените пример доменов на свои:
 
 ```caddyfile
 panel.example.org {
-    # /api/* is stripped before proxying: /api/auth/login -> /auth/login on the backend.
+    # /api/* удаляется перед проксированием:
+    # /api/auth/login -> /auth/login в backend.
     handle_path /api/* {
         reverse_proxy api:8000
     }
@@ -136,16 +212,57 @@ sub.example.org {
 }
 ```
 
-- `panel.example.org` serves the SPA and proxies `/api/*` to the backend, stripping the `/api` prefix (so `VITE_API_URL` ends in `/api` and the backend still sees its real routes like `/auth/login`).
-- `sub.example.org/<uuid>` rewrites to `panel.example.org/sub/<uuid>` — that's the public subscription URL.
+* `panel.example.org` обслуживает SPA и проксирует `/api/*` в backend, удаляя префикс `/api`.
 
-The Compose file publishes ports **80** and **443**, which is what Caddy needs for automatic HTTPS on the real domains above. If you only want plain HTTP for a quick test, replace the `panel.example.org { ... }` block with a plain-port site (Caddy then serves over HTTP, no certificates):
+  Поэтому:
+
+  ```text
+  VITE_API_URL
+  ```
+
+  заканчивается на:
+
+  ```text
+  /api
+  ```
+
+  а backend продолжает видеть свои настоящие маршруты:
+
+  ```text
+  /auth/login
+  ```
+
+* `sub.example.org/<uuid>` переписывается в:
+
+  ```text
+  panel.example.org/sub/<uuid>
+  ```
+
+  Это публичный URL подписки.
+
+Compose публикует порты:
+
+```text
+80
+443
+```
+
+Они нужны Caddy для автоматического HTTPS на настоящих доменах.
+
+Если нужен только обычный HTTP для быстрого тестирования, замените блок:
+
+```caddyfile
+panel.example.org { ... }
+```
+
+на:
 
 ```caddyfile
 :80 {
     handle_path /api/* {
         reverse_proxy api:8000
     }
+
     handle {
         root * /srv/frontend/dist
         try_files {path} /index.html
@@ -154,46 +271,124 @@ The Compose file publishes ports **80** and **443**, which is what Caddy needs f
 }
 ```
 
-## 9. Start everything
+В таком режиме Caddy работает через HTTP без сертификатов.
+
+---
+
+# 9. Запуск всего
 
 ```bash
 docker compose up -d
 ```
 
-This starts three containers:
+Будут запущены три контейнера:
 
-- `olcwave-postgres` — the database
-- `olcwave-api` — the FastAPI backend (waits for Postgres to be healthy)
-- `olcwave-caddy` — reverse proxy + static file server
+* `olcwave-postgres` — база данных
+* `olcwave-api` — FastAPI backend (ждет, пока PostgreSQL станет готов)
+* `olcwave-caddy` — reverse proxy + сервер статических файлов
 
-The backend creates its database tables automatically on first start (no migration step needed yet).
+Backend автоматически создает таблицы базы данных при первом запуске.
 
-## 10. Verify
+Отдельный шаг миграции пока не требуется.
+
+---
+
+# 10. Проверка
 
 ```bash
 docker ps
 ```
 
-You should see `olcwave-postgres`, `olcwave-api`, `olcwave-caddy` all `Up`.
+Вы должны увидеть:
 
-Check the API logs:
+```text
+olcwave-postgres
+olcwave-api
+olcwave-caddy
+```
+
+Все должны иметь статус:
+
+```text
+Up
+```
+
+Проверить логи API:
 
 ```bash
 docker compose logs -f api
 ```
 
-Then open `https://panel.example.org` (or your host) and log in with the `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `backend/.env`.
+После этого откройте:
 
-## Local / HTTP-only variant
+```text
+https://panel.example.org
+```
 
-There is a `docker-compose-dev.yaml` that runs only Postgres + the API (no Caddy). For local development it's usually easier to run the backend and frontend directly on the host — see [development.md](development.md).
+(или ваш хост)
 
-## Updating
+и войдите используя:
+
+```text
+ADMIN_USERNAME
+ADMIN_PASSWORD
+```
+
+из:
+
+```text
+backend/.env
+```
+
+---
+
+# Локальный вариант / только HTTP
+
+Есть файл:
+
+```text
+docker-compose-dev.yaml
+```
+
+который запускает только:
+
+* PostgreSQL;
+* API.
+
+Без Caddy.
+
+Для локальной разработки обычно проще запускать backend и frontend напрямую на хосте.
+
+См. [development.md](development.md).
+
+---
+
+# Обновление
 
 ```bash
 git pull
-cd frontend && npm ci && npm run build && cd ..   # rebuild SPA if it changed
-docker compose up -d --build                        # rebuild API image, restart
+
+cd frontend && npm ci && npm run build && cd ..
+
+docker compose up -d --build
 ```
 
-If you only changed `backend/.env`, no rebuild is needed — it's read at container start, so `docker compose up -d api` picks it up.
+Что происходит:
+
+* frontend пересобирается, если он изменился;
+* API image пересобирается;
+* контейнеры перезапускаются.
+
+Если изменился только:
+
+```text
+backend/.env
+```
+
+пересборка не нужна.
+
+Файл читается при старте контейнера, поэтому достаточно:
+
+```bash
+docker compose up -d api
+```

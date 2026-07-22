@@ -1,20 +1,20 @@
-# Configuration
+# Конфигурация
 
-All configuration is done through environment files. There are **three** of them, and they serve different purposes:
+Вся конфигурация выполняется через файлы окружения. Их **три**, и они служат разным целям:
 
-| File | Read by | When |
-|------|---------|------|
-| `backend/.env` | The FastAPI backend (`pydantic-settings`) | Passed into the API container via `env_file` at runtime |
-| `.env` (repo root) | Docker Compose | At `docker compose up`, to fill `${...}` in `docker-compose.yaml` |
-| `frontend/.env` | Vite | At `npm run build` — baked into the static JS |
+| Файл                        | Читается                              | Когда                                                                                |
+| --------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------ |
+| `backend/.env`              | Backend FastAPI (`pydantic-settings`) | Передается в API-контейнер через `env_file` во время запуска                         |
+| `.env` (корень репозитория) | Docker Compose                        | При выполнении `docker compose up`, для подстановки `${...}` в `docker-compose.yaml` |
+| `frontend/.env`             | Vite                                  | При `npm run build` — встраивается в статический JS                                  |
 
-The Postgres credentials appear in both `backend/.env` and the root `.env`. **They must match.**
+Учетные данные PostgreSQL присутствуют и в `backend/.env`, и в корневом `.env`. **Они должны совпадать.**
 
 ---
 
 ## backend/.env
 
-Defined and validated in `backend/src/config.py`. If a required variable is missing, the backend won't start.
+Определяется и проверяется в `backend/src/config.py`. Если обязательная переменная отсутствует, backend не запустится.
 
 ### `NAME`
 
@@ -22,7 +22,9 @@ Defined and validated in `backend/src/config.py`. If a required variable is miss
 NAME=moi-krutoi-vpnchik
 ```
 
-Display name of your service. It's used as the subscription title (`#name:` header) returned to clients. Purely cosmetic — change it freely.
+Отображаемое имя вашего сервиса. Используется как заголовок подписки (`#name:` header), который возвращается клиентам. Чисто косметический параметр — можно свободно изменять.
+
+---
 
 ### `RW_API_URL`
 
@@ -30,7 +32,15 @@ Display name of your service. It's used as the subscription title (`#name:` head
 RW_API_URL=https://remnawave.example.org
 ```
 
-Base URL of your Remnawave API. The backend calls it to check whether a subscriber's UUID is valid and to read their expiry. **Must be reachable from inside the API container.** If it's wrong or unreachable, every subscription request fails.
+Базовый URL API Remnawave.
+
+Backend обращается к нему для проверки, является ли UUID подписчика действительным, а также для получения информации об окончании срока действия.
+
+**Должен быть доступен изнутри API-контейнера.**
+
+Если значение неверное или сервис недоступен, каждый запрос подписки будет завершаться ошибкой.
+
+---
 
 ### `RW_API_TOKEN`
 
@@ -38,7 +48,15 @@ Base URL of your Remnawave API. The backend calls it to check whether a subscrib
 RW_API_TOKEN=ey...
 ```
 
-API token for Remnawave. Generate it in your Remnawave admin panel. Without it (or with a bad token), Remnawave calls fail and no subscriptions are issued. Keep it secret.
+API-токен для Remnawave.
+
+Создается в административной панели Remnawave.
+
+Без него (или с неверным токеном) запросы к Remnawave завершатся ошибкой, и подписки выдаваться не будут.
+
+Храните его в секрете.
+
+---
 
 ### `DB_HOST` / `DB_PORT`
 
@@ -47,7 +65,27 @@ DB_HOST=postgres
 DB_PORT=5432
 ```
 
-Where the database lives. In the Compose setup, `postgres` is the service name, so leave `DB_HOST=postgres`. For local development against a Postgres on your machine, use `localhost`.
+Где находится база данных.
+
+В Compose-конфигурации:
+
+```ini
+postgres
+```
+
+является именем сервиса, поэтому оставьте:
+
+```ini
+DB_HOST=postgres
+```
+
+Для локальной разработки с PostgreSQL, запущенным на вашей машине, используйте:
+
+```ini
+localhost
+```
+
+---
 
 ### `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`
 
@@ -57,13 +95,19 @@ POSTGRES_PASSWORD=strong_password_here
 POSTGRES_DB=main
 ```
 
-Database credentials. The backend builds its connection string from these:
+Учетные данные базы данных.
+
+Backend строит строку подключения:
 
 ```
 postgresql+asyncpg://<user>:<password>@<host>:<port>/<db>
 ```
 
-**These three must be identical to the ones in the root `.env`**, because that's what actually initializes the Postgres container. If they differ, the API can't authenticate to its own database.
+**Эти три значения должны полностью совпадать со значениями в корневом `.env`**, потому что именно они используются для инициализации контейнера PostgreSQL.
+
+Если значения различаются, API не сможет авторизоваться в собственной базе данных.
+
+---
 
 ### `ADMIN_USERNAME` / `ADMIN_PASSWORD`
 
@@ -72,7 +116,15 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=strong_password_also_here
 ```
 
-The single admin login for the panel. There is no user registration and no second account — this is it. Login checks these values directly (plain comparison), then issues a JWT. Use a strong password; change it and restart the API to rotate.
+Единственный логин администратора панели.
+
+Регистрации пользователей нет и второго аккаунта тоже нет — используется только этот.
+
+При входе эти значения проверяются напрямую (простое сравнение), после чего выдается JWT.
+
+Используйте надежный пароль; для его изменения измените значение и перезапустите API.
+
+---
 
 ### `JWT_SECRET_KEY`
 
@@ -80,13 +132,21 @@ The single admin login for the panel. There is no user registration and no secon
 JWT_SECRET_KEY=change_me
 ```
 
-Secret used to sign admin JWTs (HS256). **Change it to a long random string.** Anyone who knows it can forge admin tokens. Rotating it invalidates all existing sessions.
+Секрет, используемый для подписи административных JWT (HS256).
 
-Generate one:
+**Измените его на длинную случайную строку.**
+
+Любой, кто знает этот ключ, сможет создавать поддельные admin-токены.
+
+После смены ключа все существующие сессии станут недействительными.
+
+Сгенерировать:
 
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
+
+---
 
 ### `JWT_EXPIRE_MINUTES`
 
@@ -94,7 +154,21 @@ python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 JWT_EXPIRE_MINUTES=1440
 ```
 
-How long an admin token stays valid, in minutes. Default `1440` = 24 hours. After it expires the panel redirects you to login. Lower = more secure, more frequent logins.
+Время действия административного токена в минутах.
+
+По умолчанию:
+
+```ini
+1440
+```
+
+= 24 часа.
+
+После истечения срока действия панель перенаправляет пользователя на страницу входа.
+
+Меньшее значение = выше безопасность, но чаще потребуется входить заново.
+
+---
 
 ### `DEFAULT_TRAFFIC_LIMIT`
 
@@ -103,13 +177,25 @@ How long an admin token stays valid, in minutes. Default `1440` = 24 hours. Afte
 DEFAULT_TRAFFIC_LIMIT=107374182400
 ```
 
-Traffic quota (in **bytes**) assigned to a user the first time they're auto-created from a subscription request. Set `0` for unlimited. You can override any individual user's limit later in the UI.
+Лимит трафика (в **байтах**), назначаемый пользователю при первом автоматическом создании из запроса подписки.
 
-Convert GB → bytes:
+Установите:
+
+```ini
+0
+```
+
+для безлимитного режима.
+
+Позже лимит любого отдельного пользователя можно изменить через UI.
+
+Конвертация GB → bytes:
 
 ```bash
 python3 -c "print(int(input())*(1024**3))"
 ```
+
+---
 
 ### `TRAFFIC_COLLECT_INTERVAL`
 
@@ -118,23 +204,39 @@ python3 -c "print(int(input())*(1024**3))"
 TRAFFIC_COLLECT_INTERVAL=10
 ```
 
-How often (seconds) the background traffic loop reads each running container's counters, adds the delta to the owning user, and stops the user's containers if they're over the limit. Lower = tighter enforcement and more Docker exec calls; higher = less overhead but coarser accounting.
+Как часто (в секундах) фоновый цикл учета трафика:
 
-### `CORS_ORIGINS` (optional)
+* читает счетчики каждого работающего контейнера;
+* добавляет разницу владельцу контейнера;
+* останавливает контейнеры пользователя при превышении лимита.
 
-Not in `.env.example`; has a default in `config.py`:
+Меньшее значение = более строгий контроль и больше вызовов Docker exec.
+
+Большее значение = меньше нагрузка, но менее точный учет.
+
+---
+
+### `CORS_ORIGINS` (опционально)
+
+Не присутствует в `.env.example`; имеет значение по умолчанию в `config.py`:
 
 ```python
 CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173"]
 ```
 
-Browser origins allowed to call the API. The defaults cover local dev. For production you generally serve the SPA and API from the same origin through Caddy, so CORS isn't hit — but if you call the API cross-origin, add your panel domain here (as a Python-style list in the env value).
+Источники браузера, которым разрешено обращаться к API.
+
+Значения по умолчанию подходят для локальной разработки.
+
+В production обычно SPA и API обслуживаются через Caddy с одного origin, поэтому CORS не используется.
+
+Но если API вызывается с другого origin, добавьте домен панели сюда (в виде Python-style списка в значении переменной окружения).
 
 ---
 
-## Root `.env` (for Docker Compose)
+# Корневой `.env` (для Docker Compose)
 
-Only three variables, only used to initialize the Postgres container:
+Только три переменные, используемые исключительно для инициализации контейнера PostgreSQL:
 
 ```ini
 POSTGRES_USER=postgres
@@ -142,32 +244,80 @@ POSTGRES_PASSWORD=strong_password_here
 POSTGRES_DB=main
 ```
 
-Compose reads this file automatically because it sits next to `docker-compose.yaml`. Again: keep these equal to the same-named values in `backend/.env`.
+Compose автоматически читает этот файл, так как он находится рядом с:
+
+```ini
+docker-compose.yaml
+```
+
+Еще раз: эти значения должны совпадать с одноименными значениями в:
+
+```ini
+backend/.env
+```
 
 ---
 
-## frontend/.env
+# frontend/.env
 
-Read by Vite at build time. Both values end up hard-coded in the compiled JS, so **rebuild the frontend after changing them** (`npm run build`).
+Читается Vite во время сборки.
 
-### `VITE_API_URL`
+Оба значения в итоге оказываются жестко встроенными в скомпилированный JS, поэтому **после их изменения необходимо пересобрать frontend**:
+
+```bash
+npm run build
+```
+
+---
+
+## `VITE_API_URL`
 
 ```ini
 VITE_API_URL=http://localhost:8000
 ```
 
-Base URL the browser uses to reach the backend. For local dev, `http://localhost:8000`. For production behind Caddy, your panel domain **with the `/api` suffix** (e.g. `https://panel.example.org/api`) — Caddy strips `/api` before forwarding, so the backend still sees its real routes (see [installation.md](installation.md)).
+Базовый URL, который браузер использует для обращения к backend.
 
-### `VITE_SUB_URL_TEMPLATE`
+Для локальной разработки:
+
+```ini
+http://localhost:8000
+```
+
+Для production за Caddy:
+
+домен панели **с суффиксом `/api`**:
+
+```ini
+https://panel.example.org/api
+```
+
+Caddy удаляет `/api` перед проксированием, поэтому backend продолжает получать свои реальные маршруты (см. [installation.md](installation.md)).
+
+---
+
+## `VITE_SUB_URL_TEMPLATE`
 
 ```ini
 VITE_SUB_URL_TEMPLATE=https://sub.example.org/{uuid}
 ```
 
-Template for the per-user subscription link shown and copied in the UI. Every `{uuid}` is replaced with the user's short UUID:
+Шаблон ссылки подписки пользователя, которая отображается и копируется в UI.
+
+Каждый:
+
+```ini
+{uuid}
+```
+
+заменяется на короткий UUID пользователя:
 
 ```
 https://sub.example.org/{uuid}  →  https://sub.example.org/rfWMHbDFsH_cPXRz
 ```
 
-If left empty, the UI falls back to `<current-origin>/sub/<uuid>`.
+Если оставить пустым, UI использует:
+
+```
+<current-origin>/sub/<uuid>
+```
