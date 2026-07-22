@@ -92,51 +92,7 @@ JWT_SECRET_KEY=<random string>
 
 ---
 
-# 5. Настройка Compose (корневой `.env`)
-
-Docker Compose подставляет:
-
-```text
-${POSTGRES_USER}
-${POSTGRES_PASSWORD}
-${POSTGRES_DB}
-```
-
-в `docker-compose.yaml` из файла:
-
-```text
-.env
-```
-
-в корне репозитория.
-
-Это отдельный файл от:
-
-```text
-backend/.env
-```
-
-и три значения PostgreSQL **обязательно должны совпадать** со значениями из `backend/.env`.
-
-Иначе API и база данных будут использовать разные учетные данные.
-
-Создайте:
-
-```text
-./.env
-```
-
-Содержимое:
-
-```ini
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=<тот же надежный пароль, что и в backend/.env>
-POSTGRES_DB=main
-```
-
----
-
-# 6. Настройка frontend
+# 5. Настройка frontend
 
 ```bash
 cp frontend/.env.example frontend/.env
@@ -160,7 +116,7 @@ VITE_SUB_URL_TEMPLATE=https://sub.example.org/{uuid}
 
 ---
 
-# 7. Сборка frontend
+# 6. Сборка frontend
 
 Caddy раздает статические файлы из:
 
@@ -179,7 +135,7 @@ cd ..
 
 ---
 
-# 8. Настройка доменов в Caddy
+# 7. Настройка доменов в Caddy
 
 Откройте:
 
@@ -275,7 +231,7 @@ panel.example.org { ... }
 
 ---
 
-# 9. Запуск всего
+# 8. Запуск всего
 
 ```bash
 docker compose up -d
