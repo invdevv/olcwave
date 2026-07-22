@@ -207,10 +207,11 @@ collect_input() {
   PANEL_URL="${PANEL_URL%/}"                       # drop trailing slash
   VITE_API_URL="${PANEL_URL}/api"
 
-  # Subscription template shown/copied in the UI. {uuid} is substituted per user.
-  info "Subscription URL template - {uuid} is replaced with each user's short UUID."
-  info "  examples: https://sub.example.com/{uuid}   or   ${PANEL_URL}/sub/{uuid}"
-  ask SUB_URL_TEMPLATE "Subscription URL template" "${PANEL_URL}/sub/{uuid}"
+  PANEL_DOMAIN="${PANEL_URL#https://}"
+  PANEL_DOMAIN="${PANEL_DOMAIN#http://}"
+
+  ask SUB_DOMAIN "Subscription domain (e.g. sub.example.com)" "sub.${PANEL_DOMAIN}"
+  SUB_URL_TEMPLATE="https://$SUB_DOMAIN/{uuid}"
 
   # Postgres credentials are generated, not asked. They are written identically
   POSTGRES_USER="olcwave"
@@ -260,6 +261,24 @@ write_frontend_env() {
     printf 'VITE_SUB_URL_TEMPLATE=%s\n' "$SUB_URL_TEMPLATE"
   } > frontend/.env
   success "Wrote frontend/.env"
+}
+
+write_caddyfile() {
+  info "Generating caddy/Caddyfile..."
+
+  local template="caddy/Caddyfile.template"
+  local target="caddy/Caddyfile"
+
+  [ -f "$template" ] || die "$template not found."
+
+  may_overwrite "$target" || return 0
+
+  sed \
+    -e "s|{{PANEL_DOMAIN}}|${PANEL_DOMAIN}|g" \
+    -e "s|{{SUB_DOMAIN}}|${SUB_DOMAIN}|g" \
+    "$template" > "$target"
+
+  success "Generated caddy/Caddyfile"
 }
 
 # ---------------------------------------------------------------------------
@@ -342,6 +361,7 @@ main() {
   collect_input
   write_backend_env
   write_frontend_env
+  write_caddyfile
   build_frontend
   start_stack
   verify_stack

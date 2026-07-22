@@ -1,4 +1,4 @@
-panel.example.org {
+{{PANEL_DOMAIN}} {
     handle_path /api/* {
         reverse_proxy api:8000
     }
@@ -11,9 +11,9 @@ panel.example.org {
 }
 
 
-sub.example.org {
+{{SUB_DOMAIN}} {
     handle {
         rewrite * /sub{uri}
-        reverse_proxy panel.example.org
+        reverse_proxy {{PANEL_DOMAIN}}
     }
 }
