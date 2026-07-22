@@ -12,7 +12,7 @@ export default function AppLayout() {
       <div className={`transition-all duration-200 ${collapsed ? 'ml-16' : 'ml-60'}`}>
         <Topbar />
         <main className="px-6 py-6">
-          <div className="mx-auto max-w-6xl animate-fade-in">
+          <div className="mx-auto max-w-7xl animate-fade-in">
             <Outlet />
           </div>
         </main>

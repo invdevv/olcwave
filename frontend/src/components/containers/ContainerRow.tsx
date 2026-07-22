@@ -105,8 +105,8 @@ export default function ContainerRow({
         {/* Status */}
         <Td><StatusBadge status={container.status} /></Td>
         {/* Actions */}
-        <td className="px-4 py-2.5 text-right" onClick={stop}>
-          <div className="flex items-center justify-end gap-1">
+        <td className="px-2.5 py-2.5 text-right" onClick={stop}>
+          <div className="flex items-center justify-end gap-0.5">
             <ActionButton
               icon={isRunning ? StopIcon : PlayIcon}
               label={isRunning ? 'Stop' : 'Start'}
@@ -149,7 +149,7 @@ export default function ContainerRow({
 }
 
 function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-2.5 text-xs ${className}`}>{children}</td>
+  return <td className={`px-2.5 py-2.5 text-xs ${className}`}>{children}</td>
 }
 
 function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
@@ -183,7 +183,7 @@ function ActionButton({ icon: Icon, label, onClick, loading, disabled, variant =
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className={`inline-flex items-center gap-1.5 h-7 px-2 text-xs font-medium rounded-md
+      className={`inline-flex items-center gap-1.5 h-7 px-1.5 text-xs font-medium rounded-md
         transition-all duration-150 cursor-pointer active:scale-[0.98]
         disabled:opacity-40 disabled:pointer-events-none ${actionVariants[variant]}`}
       title={label}

@@ -198,7 +198,7 @@ export default function Containers() {
 
 function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <th className={`px-4 py-2.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap ${className}`}>
+    <th className={`px-2.5 py-2.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap ${className}`}>
       {children}
     </th>
   )
@@ -217,7 +217,7 @@ function SortableTh({
 }) {
   const active = sort.key === sortKey
   return (
-    <th className="px-4 py-2.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap">
+    <th className="px-2.5 py-2.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap">
       <button
         onClick={() => onSort(sortKey)}
         className={`inline-flex items-center gap-1 transition-colors cursor-pointer hover:text-text-primary ${active ? 'text-text-primary' : ''}`}
