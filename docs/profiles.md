@@ -95,7 +95,8 @@ crypto:
   key: ""
 net:
   transport: datachannel
-  dns: "0.0.0.0:53"
+  dns: "8.8.8.8:53"
+data: data
 ```
 
 ### С нестандартным transport
@@ -120,10 +121,11 @@ crypto:
   key: ""
 net:
   transport: vp8channel
-  dns: "0.0.0.0:53"
+  dns: "8.8.8.8:53"
 vp8:
   fps: 60
   batch: 64
+data: data
 ```
 
 ## Поля, которые реально читает панель
