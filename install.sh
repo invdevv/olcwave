@@ -2,7 +2,7 @@
 #
 # install.sh - interactive installer for OLCWave.
 #
-# Asks you a handful of questions, then generates backend/.env, the root .env
+# Asks you a handful of questions, then generates backend/.env
 # (for Docker Compose) and frontend/.env for you, builds the frontend, and
 # brings the Docker Compose stack up. No manual file editing required.
 #
@@ -103,6 +103,15 @@ require_root() {
   fi
 }
 
+install_base_packages() {
+    info "Installing base packages..."
+
+    apt-get update
+    apt-get install -y curl ca-certificates openssl git
+
+    success "Base packages installed."
+}
+
 # ---------------------------------------------------------------------------
 # 1. Dependency checks and installs
 # ---------------------------------------------------------------------------
@@ -172,20 +181,14 @@ collect_input() {
   info "Configuration - answer the prompts below. Defaults are shown in [brackets]."
   printf '\n' > /dev/tty
 
-  ask          PROJECT_NAME  "Project name"            "OLCWave"
+  ask          SUB_NAME  "Subscription name"            "OLCWave"
   ask_required RW_API_URL    "Remnawave URL (e.g. https://rw.example.com)"
   ask_secret   RW_API_TOKEN  "Remnawave API token (hidden)"
 
   ask          ADMIN_USERNAME "Admin username"          "admin"
-  ask_secret   ADMIN_PASSWORD "Admin password (hidden)"
 
-  # JWT secret - offer to generate one automatically.
-  if confirm "Generate JWT secret automatically?"; then
-    JWT_SECRET_KEY="$(generate_secret)"
-    success "Generated a random JWT secret."
-  else
-    ask_secret JWT_SECRET_KEY "JWT secret (hidden)"
-  fi
+  JWT_SECRET_KEY="$(generate_secret)"
+  ADMIN_PASSWORD="$(generate_secret)"
 
   # Traffic limit is asked in GB and converted to bytes. 0 = unlimited.
   while :; do
@@ -200,7 +203,7 @@ collect_input() {
   ask TRAFFIC_COLLECT_INTERVAL "Traffic collection interval (seconds)" "10"
 
   # Panel URL drives the frontend. Caddy strips /api, so VITE_API_URL = <panel>/api.
-  ask_required PANEL_URL "Panel URL (e.g. https://panel.example.com)"
+  ask_required PANEL_URL "OLCWave Panel URL (e.g. https://panel.example.com)"
   PANEL_URL="${PANEL_URL%/}"                       # drop trailing slash
   VITE_API_URL="${PANEL_URL}/api"
 
@@ -210,8 +213,7 @@ collect_input() {
   ask SUB_URL_TEMPLATE "Subscription URL template" "${PANEL_URL}/sub/{uuid}"
 
   # Postgres credentials are generated, not asked. They are written identically
-  # to backend/.env and the root .env so the API and the database always agree.
-  POSTGRES_USER="postgres"
+  POSTGRES_USER="olcwave"
   POSTGRES_DB="main"
   POSTGRES_PASSWORD="$(generate_secret)"
 }
@@ -232,7 +234,7 @@ write_backend_env() {
   may_overwrite "backend/.env" || return 0
   # printf '%s' keeps values verbatim (safe for passwords with special chars).
   {
-    printf 'NAME=%s\n\n'                     "$PROJECT_NAME"
+    printf 'NAME=%s\n\n'                     "$SUB_NAME"
     printf 'RW_API_URL=%s\n'                 "$RW_API_URL"
     printf 'RW_API_TOKEN=%s\n\n'             "$RW_API_TOKEN"
     printf 'DB_HOST=postgres\n'
@@ -249,19 +251,6 @@ write_backend_env() {
     printf 'TRAFFIC_COLLECT_INTERVAL=%s\n'   "$TRAFFIC_COLLECT_INTERVAL"
   } > backend/.env
   success "Wrote backend/.env"
-}
-
-write_root_env() {
-  may_overwrite ".env" || return 0
-  # Docker Compose reads this for ${POSTGRES_*} substitution. Must match backend/.env.
-  {
-    printf '# Read by Docker Compose to fill ${...} in docker-compose.yaml.\n'
-    printf '# These values match POSTGRES_* in backend/.env.\n'
-    printf 'POSTGRES_USER=%s\n'     "$POSTGRES_USER"
-    printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
-    printf 'POSTGRES_DB=%s\n'       "$POSTGRES_DB"
-  } > .env
-  success "Wrote .env (Docker Compose)"
 }
 
 write_frontend_env() {
@@ -284,7 +273,11 @@ build_frontend() {
       info "node_modules present - skipping dependency install."
     else
       info "Installing dependencies (npm ci)..."
-      npm ci
+      if [ -f package-lock.json ]; then
+        npm ci
+      else
+        npm install
+      fi
     fi
     npm run build
   )
@@ -329,7 +322,7 @@ verify_stack() {
 print_summary() {
   local line="========================================"
   printf '\n%s%s%s\n\n' "$C_GREEN" "$line" "$C_RESET"
-  printf '  %s%s installed successfully%s\n\n' "$C_BOLD" "$PROJECT_NAME" "$C_RESET"
+  printf '  %s%s installed successfully%s\n\n' "$C_BOLD" "$SUB_NAME" "$C_RESET"
   printf '  Panel\n    %s\n\n'                 "$PANEL_URL"
   printf '  Admin username\n    %s\n\n'        "$ADMIN_USERNAME"
   printf '  Subscription template\n    %s\n\n' "$SUB_URL_TEMPLATE"
@@ -343,10 +336,10 @@ print_summary() {
 # ---------------------------------------------------------------------------
 main() {
   require_root
+  install_base_packages
   check_dependencies
   collect_input
   write_backend_env
-  write_root_env
   write_frontend_env
   build_frontend
   start_stack
