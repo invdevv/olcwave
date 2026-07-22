@@ -7,6 +7,9 @@ services:
     container_name: olcwave-api
     restart: unless-stopped
 
+    env_file:
+      - ./backend/.env
+
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
 

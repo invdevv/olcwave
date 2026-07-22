@@ -1,5 +1,6 @@
 panel.example.org {
-    handle /api/* {
+    # /api/* is stripped before proxying, so /api/auth/login -> /auth/login on the backend.
+    handle_path /api/* {
         reverse_proxy api:8000
     }
 
