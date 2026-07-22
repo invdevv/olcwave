@@ -93,36 +93,6 @@ docker logs olcwave-<tag>-<uuid>  # конкретный OLCRTC контейне
 
 **Причины и исправления:**
 
-* **Несовпадение данных доступа** - значения:
-
-  ```
-  POSTGRES_USER
-  POSTGRES_PASSWORD
-  POSTGRES_DB
-  ```
-
-  в `backend/.env` должны совпадать с теми же значениями в корневом `.env`.
-
-  Если они отличаются, база была инициализирована с одним набором данных, а API пытается подключиться с другим.
-
-  Сделайте их одинаковыми, затем:
-
-  ```bash
-  docker compose down
-  ```
-
-  Если база уже была создана с неправильным паролем, удалите её volume:
-
-  ```bash
-  docker volume rm olcwave_postgres_data   # удаляет все данные
-  ```
-
-  После этого:
-
-  ```bash
-  docker compose up -d
-  ```
-
 * **Неверный host** - внутри Compose:
 
   ```text
@@ -391,9 +361,3 @@ traffic_used_bytes
   cd frontend && npm run build && cd ..
   docker compose restart caddy
   ```
-
-* **Корневой `.env` (данные PostgreSQL)**
-
-  Используется только при первом создании volume PostgreSQL.
-
-  Если изменить его позже, потребуется сбросить volume (см. раздел про базу данных).
