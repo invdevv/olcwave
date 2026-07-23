@@ -86,7 +86,7 @@ room:
 Минимальный профиль OLCRTC с корректной структурой (соответствует структуре, которую читает панель, и резервной конфигурации, которую она использует):
 
 ```yaml
-mode: cnc
+mode: srv
 auth:
   provider: jitsi
 room:
@@ -112,7 +112,7 @@ OLCRTC поддерживает транспорты помимо `datachannel`.
 Пример с VP8:
 
 ```yaml
-mode: cnc
+mode: srv
 auth:
   provider: jitsi
 room:
