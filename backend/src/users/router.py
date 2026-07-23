@@ -23,7 +23,7 @@ async def delete(short_uuid: str, _admin: dict = Depends(get_current_admin)):
     return user
 
 @router.get("/all")
-async def get_all(tag: str, _admin: dict = Depends(get_current_admin)):
+async def get_all(_admin: dict = Depends(get_current_admin)):
     users = await Users.get_all()
 
     return users

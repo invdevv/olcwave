@@ -3,7 +3,7 @@ import type { Profile } from '../types'
 
 export const profilesApi = {
   getAll: () =>
-    api.get<Profile[]>('/profiles/all', { params: { tag: '' } }),
+    api.get<Profile[]>('/profiles/all', { params: {} }),
 
   create: (profile: Pick<Profile, 'name' | 'tag' | 'profile'>) =>
     api.post<string>('/profiles/', profile),

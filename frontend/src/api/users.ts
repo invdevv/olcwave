@@ -3,7 +3,7 @@ import type { User, TrafficInfo } from '../types'
 
 export const usersApi = {
   getAll: () =>
-    api.get<User[]>('/users/all', { params: { tag: '' } }),
+    api.get<User[]>('/users/all', { params: {} }),
 
   getByShortUuid: (shortUuid: string) =>
     api.get<User>('/users/', { params: { short_uuid: shortUuid } }),

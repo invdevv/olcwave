@@ -27,7 +27,7 @@ async def delete(tag: str, _admin: dict = Depends(get_current_admin)):
     await Profiles.delete(tag)
 
 @router.get("/all")
-async def get_all(tag: str, _admin: dict = Depends(get_current_admin)):
+async def get_all(_admin: dict = Depends(get_current_admin)):
     profiles = await Profiles.get_all()
 
     return profiles
