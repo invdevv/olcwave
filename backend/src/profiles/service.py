@@ -13,6 +13,7 @@ class Profiles:
         profile_obj: dict = yaml.safe_load(config)  
 
         profile_obj['mode'] = "srv"
+        profile_obj['data'] = "data"
 
         if profile_obj.get('socks', None):
             profile_obj.pop('socks')

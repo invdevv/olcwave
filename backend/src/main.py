@@ -15,7 +15,7 @@ from olcrtc.router import router as containers_router
 from config import settings
 from database import create_tables
 from traffic import TrafficManager
-from sync import SyncManager
+from rw_sync import SyncManager
 
 
 async def lifespan(app: FastAPI):

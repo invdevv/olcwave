@@ -1,4 +1,4 @@
-panel.example.org {
+olcwave.example.org {
     handle_path /api/* {
         reverse_proxy api:8000
     }
@@ -11,7 +11,7 @@ panel.example.org {
 }
 
 
-sub.example.org {
+olcsub.example.org {
     handle {
         rewrite * /sub{uri}
         reverse_proxy api:8000

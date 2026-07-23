@@ -78,7 +78,6 @@ Frontend (React SPA)                /sub/{uuid}
 | [profiles.md](docs/profiles.md)               | Работа профилей, генерация конфигураций и примеры YAML     |
 | [architecture.md](docs/architecture.md)       | Архитектура системы, потоки запросов, учёт трафика и Caddy |
 | [development.md](docs/development.md)         | Локальная разработка и рекомендации для участников проекта |
-| [api.md](docs/api.md)                         | Описание HTTP API                                          |
 | [troubleshooting.md](docs/troubleshooting.md) | Частые проблемы и способы их решения                       |
 
 ## Лицензия

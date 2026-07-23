@@ -25,8 +25,6 @@ class OlcRTC:
 
     @staticmethod
     def run(config: str, config_tag: str, user_id: str, rebuild: bool = False):
-        OlcRTC.build(rebuild)
-
         name = f"olcwave-{config_tag}-{user_id}"
 
         try:

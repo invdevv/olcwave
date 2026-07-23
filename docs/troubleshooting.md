@@ -332,7 +332,7 @@ traffic_used_bytes
   например:
 
   ```
-  https://panel.example.org/api
+  https://olcwave.example.org/api
   ```
 
   См. шаг 8 в [installation.md](installation.md).

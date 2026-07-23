@@ -14,26 +14,9 @@
 
 API-контейнер монтирует `/var/run/docker.sock`, поэтому он напрямую управляет Docker daemon хоста - именно так он собирает образ `olcrtc` и запускает/останавливает OLCRTC-контейнеры.
 
-## Модель данных
-
-Две таблицы, создаваемые автоматически при запуске backend (`create_tables`, пока без Alembic).
-
-**users**
-
-* `short_uuid` - короткий UUID Remnawave, уникальный. Это связь между подписчиком и его локальной записью.
-* `created_at`, `expires_at` - срок действия, скопированный из Remnawave при первом обнаружении.
-* `traffic_limit_bytes` - `0` означает безлимит.
-* `traffic_used_bytes` - накапливается циклом учета трафика.
-
-**profiles**
-
-* `name`, `tag` (уникальный), `profile` (YAML-шаблон).
-
-Примечание: пользователи создаются **лениво**. Нет кнопки "add user" - локальная запись пользователя появляется при первом запросе действительной подписки для этого UUID.
-
 ## Основной поток: запрос подписки
 
-Это сердце системы. Когда клиент обращается к:
+Когда клиент обращается к:
 
 ```
 GET /sub/{short_uuid}
@@ -59,7 +42,7 @@ GET /sub/{short_uuid}
       └─ сгенерировать новый config (случайный crypto.key, имя комнаты)
       └─ запустить новый контейнер olcwave-<tag>-<short_uuid>
 
-6. Создать OLCBox v5 bundle из конфигурации каждого профиля и вернуть его.
+6. Создать OLCBox конфиг из конфигурации каждого профиля и вернуть его.
 ```
 
 Таким образом, при первом открытии пользователем своей ссылки его контейнеры запускаются по требованию. Последующие запросы используют уже запущенные контейнеры.
@@ -182,10 +165,10 @@ panel.example.org {
     }
 }
 
-sub.example.org {
+olcsub.example.org {
     handle {
-        rewrite * /sub{uri}              # sub.example.org/<uuid>
-        reverse_proxy panel.example.org  #   → panel.example.org/sub/<uuid>
+        rewrite * /sub{uri}              # olcsub.example.org/<uuid>
+        reverse_proxy olcwave.example.org  #   → olcwave.example.org/sub/<uuid>
     }
 }
 ```
