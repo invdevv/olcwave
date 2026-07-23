@@ -5,7 +5,6 @@ import {
   UsersIcon,
   UserCircleIcon,
   CubeIcon,
-  LinkIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   BoltIcon,
@@ -17,7 +16,6 @@ const nav = [
   { to: '/users', label: 'Users', icon: UsersIcon },
   { to: '/profiles', label: 'Profiles', icon: UserCircleIcon },
   { to: '/containers', label: 'Containers', icon: CubeIcon },
-  { to: '/subscriptions', label: 'Subscriptions', icon: LinkIcon },
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ]
 

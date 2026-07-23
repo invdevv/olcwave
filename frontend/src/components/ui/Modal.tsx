@@ -8,9 +8,10 @@ interface ModalProps {
   description?: string
   children: ReactNode
   wide?: boolean
+  headerAction?: ReactNode
 }
 
-export default function Modal({ open, onClose, title, description, children, wide }: ModalProps) {
+export default function Modal({ open, onClose, title, description, children, wide, headerAction }: ModalProps) {
   useEffect(() => {
     if (!open) return
     document.body.style.overflow = 'hidden'
@@ -36,13 +37,16 @@ export default function Modal({ open, onClose, title, description, children, wid
             <h3 className="text-sm font-semibold text-text-primary truncate">{title}</h3>
             {description && <p className="text-xs text-text-muted mt-0.5">{description}</p>}
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 -mr-1 -mt-0.5 p-1 rounded-md text-text-muted hover:text-text-primary
-              hover:bg-bg-hover transition-colors cursor-pointer"
-          >
-            <XMarkIcon className="w-4.5 h-4.5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {headerAction}
+            <button
+              onClick={onClose}
+              className="-mr-1 -mt-0.5 p-1 rounded-md text-text-muted hover:text-text-primary
+                hover:bg-bg-hover transition-colors cursor-pointer"
+            >
+              <XMarkIcon className="w-4.5 h-4.5" />
+            </button>
+          </div>
         </div>
         <div className="p-5">{children}</div>
       </div>

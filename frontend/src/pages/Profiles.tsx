@@ -15,6 +15,7 @@ import {
   ArrowPathIcon,
   UserCircleIcon,
   ExclamationCircleIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Profiles() {
@@ -186,11 +187,57 @@ function FormError({ message }: { message: string }) {
   )
 }
 
+function ProfileHelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Как создать профиль">
+      <div className="space-y-4 text-sm text-text-primary">
+        <section>
+          <p className="font-semibold text-text-primary mb-1">Что такое профиль?</p>
+          <p className="text-text-secondary">Профиль - переиспользуемый YAML-шаблон конфигурации OLCRTC. На его основе для каждого подписчика автоматически создаётся отдельный контейнер.</p>
+        </section>
+        <section>
+          <p className="font-semibold text-text-primary mb-1">Как создать профиль?</p>
+          <ol className="list-decimal list-inside space-y-1 text-text-secondary">
+            <li>Введите отображаемое имя (например, <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">Germany - VP8</code>).</li>
+            <li>Введите тег - короткий уникальный идентификатор без символа <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">-</code> (например, <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">de_vp8</code>).</li>
+            <li>Вставьте YAML-конфигурацию в поле ниже и нажмите <strong>Create Profile</strong>.</li>
+          </ol>
+        </section>
+        <section>
+          <p className="font-semibold text-text-primary mb-1">Важные параметры</p>
+          <ul className="space-y-1 text-text-secondary">
+            <li><code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">tag</code> - уникальный идентификатор; <span className="text-warning">не используйте</span> символ <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">-</code>, иначе система трафика не сможет определить владельца контейнера.</li>
+            <li><code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">crypto.key</code> - оставьте пустым (<code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">key: ""</code>); панель сама генерирует уникальный ключ для каждого пользователя.</li>
+            <li><code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">room.id</code> - для Jitsi укажите только базовый URL сервера; панель добавит случайное имя комнаты автоматически.</li>
+            <li><code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">net.transport</code> - один из: <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">datachannel</code>, <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">vp8channel</code>, <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">seichannel</code>, <code className="text-xs font-mono text-accent bg-accent/10 px-1 rounded">videochannel</code>.</li>
+          </ul>
+        </section>
+        <section className="bg-bg-tertiary rounded-lg px-3 py-2.5">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Минимальный пример</p>
+          <pre className="text-xs font-mono text-text-secondary leading-relaxed whitespace-pre">{`mode: srv
+auth:
+  provider: jitsi
+room:
+  id: "https://jitsi.example.org"
+crypto:
+  key: ""
+net:
+  transport: datachannel
+  dns: "8.8.8.8:53"
+data: data`}</pre>
+        </section>
+        <p className="text-xs text-text-muted">Редактирование профиля останавливает все контейнеры с этим тегом - они пересоздадутся при следующем обновлении подписки.</p>
+      </div>
+    </Modal>
+  )
+}
+
 function CreateProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [name, setName] = useState('')
   const [tag, setTag] = useState('')
   const [config, setConfig] = useState('')
   const [error, setError] = useState('')
+  const [helpOpen, setHelpOpen] = useState(false)
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -208,32 +255,50 @@ function CreateProfileModal({ open, onClose }: { open: boolean; onClose: () => v
   const reset = () => { setName(''); setTag(''); setConfig(''); setError('') }
 
   return (
-    <Modal open={open} onClose={() => { reset(); onClose() }} title="Create Profile" description="Add a new configuration profile" wide>
-      <div className="space-y-4">
-        {error && <FormError message={error} />}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Display name" />
-          <Input label="Tag" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="unique-tag" />
+    <>
+      <Modal
+        open={open}
+        onClose={() => { reset(); onClose() }}
+        title="Create Profile"
+        description="Add a new configuration profile"
+        wide
+        headerAction={
+          <button
+            onClick={() => setHelpOpen(true)}
+            className="flex items-center justify-center w-6 h-6 rounded-full bg-success/15 text-success hover:bg-success/25 transition-colors cursor-pointer"
+            title="Как создать профиль"
+          >
+            <QuestionMarkCircleIcon className="w-5 h-5" />
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          {error && <FormError message={error} />}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Display name" />
+            <Input label="Tag" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="unique_tag" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">YAML Config</label>
+            <textarea
+              value={config}
+              onChange={(e) => setConfig(e.target.value)}
+              placeholder="Paste YAML configuration here..."
+              rows={16}
+              className="bg-bg-tertiary border border-border rounded-md px-3 py-2.5 text-sm text-text-primary leading-relaxed
+                placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30
+                font-mono resize-y transition-all"
+              spellCheck={false}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => { reset(); onClose() }}>Cancel</Button>
+            <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>Create Profile</Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-text-secondary">YAML Config</label>
-          <textarea
-            value={config}
-            onChange={(e) => setConfig(e.target.value)}
-            placeholder="Paste YAML configuration here..."
-            rows={16}
-            className="bg-bg-tertiary border border-border rounded-md px-3 py-2.5 text-sm text-text-primary leading-relaxed
-              placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30
-              font-mono resize-y transition-all"
-            spellCheck={false}
-          />
-        </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={() => { reset(); onClose() }}>Cancel</Button>
-          <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>Create Profile</Button>
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+      <ProfileHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
   )
 }
 
@@ -241,6 +306,7 @@ function EditProfileModal({ profile, onClose }: { profile: Profile | null; onClo
   const [name, setName] = useState('')
   const [config, setConfig] = useState('')
   const [error, setError] = useState('')
+  const [helpOpen, setHelpOpen] = useState(false)
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -266,38 +332,56 @@ function EditProfileModal({ profile, onClose }: { profile: Profile | null; onClo
   if (!profile) return null
 
   return (
-    <Modal open={!!profile} onClose={onClose} title={`Edit: ${profile.name}`} description={`Tag: ${profile.tag}`} wide>
-      <div className="space-y-4">
-        {error && <FormError message={error} />}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">Tag (read-only)</label>
-            <div className="h-9 flex items-center bg-bg-primary border border-border rounded-md px-3 text-sm font-mono text-text-muted">
-              {profile.tag}
+    <>
+      <Modal
+        open={!!profile}
+        onClose={onClose}
+        title={`Edit: ${profile.name}`}
+        description={`Tag: ${profile.tag}`}
+        wide
+        headerAction={
+            <button
+              onClick={() => setHelpOpen(true)}
+              className="flex items-center justify-center w-6 h-6 rounded-full bg-success/15 text-success hover:bg-success/25 transition-colors cursor-pointer"
+              title="Как создать профиль"
+            >
+              <QuestionMarkCircleIcon className="w-5 h-5" />
+            </button>
+          }
+      >
+        <div className="space-y-4">
+          {error && <FormError message={error} />}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-text-secondary">Tag (read-only)</label>
+              <div className="h-9 flex items-center bg-bg-primary border border-border rounded-md px-3 text-sm font-mono text-text-muted">
+                {profile.tag}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-text-secondary">YAML Config</label>
-            <span className="text-xs text-text-muted tabular-nums">{config.length} chars</span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-text-secondary">YAML Config</label>
+              <span className="text-xs text-text-muted tabular-nums">{config.length} chars</span>
+            </div>
+            <textarea
+              value={config}
+              onChange={(e) => setConfig(e.target.value)}
+              rows={18}
+              className="bg-bg-tertiary border border-border rounded-md px-3 py-2.5 text-sm text-text-primary leading-relaxed
+                focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30
+                font-mono resize-y transition-all"
+              spellCheck={false}
+            />
           </div>
-          <textarea
-            value={config}
-            onChange={(e) => setConfig(e.target.value)}
-            rows={18}
-            className="bg-bg-tertiary border border-border rounded-md px-3 py-2.5 text-sm text-text-primary leading-relaxed
-              focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30
-              font-mono resize-y transition-all"
-            spellCheck={false}
-          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>Save Changes</Button>
+          </div>
         </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>Save Changes</Button>
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+      <ProfileHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
   )
 }
