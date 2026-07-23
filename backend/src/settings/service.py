@@ -1,17 +1,16 @@
-from settings.schemas import RuntimeSettings
-
 from settings.models import SettingsModel
 from settings.schemas import RuntimeSettings
 from database import async_session_factory
 
 
-_settings = RuntimeSettings()
-
-
 class SettingsService:
+    _settings: RuntimeSettings | None = None
+
     @staticmethod
-    def get() -> RuntimeSettings:
-        return _settings
+    def get():
+        if SettingsService._settings is None:
+            raise RuntimeError("Settings not loaded")
+        return SettingsService._settings
 
     @staticmethod
     async def load():

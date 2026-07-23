@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import uvicorn
 
-from auth.router import router as auth_router
 from settings.service import SettingsService
+from auth.router import router as auth_router
 from profiles.router import router as configs_router
 from users.router import router as users_router
 from subscriptions.router import router as subscriptions_router
