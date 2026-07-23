@@ -1,5 +1,6 @@
-import profile
 import yaml
+
+from fastapi import HTTPException
 
 from olcrtc.sdk import OlcRTC
 from database import async_session_factory
@@ -23,6 +24,9 @@ class Profiles:
     @staticmethod
     async def add(profile: ProfileSchema):
         profile.profile = Profiles.validate(profile.profile)
+
+        if not profile.tag:
+            return HTTPException(status_code=400, detail="Tag cannot be empty")
 
         profile.tag = profile.tag.replace("-", "")
 
