@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
+from settings.service import SettingsService
 from rw.sdk import getAllUsers
 from database import async_session_factory
 from users.db import UserDB
@@ -112,6 +113,8 @@ class Users:
             if short_uuid not in rw_map:
                 await Users.delete(short_uuid)
                 deleted += 1
+
+        await SettingsService.update_last_sync(datetime.now(timezone.utc))
 
         return {
             "created": created,
