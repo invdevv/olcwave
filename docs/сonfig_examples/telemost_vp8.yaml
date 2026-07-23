@@ -1,0 +1,10 @@
+auth:
+  provider: telemost
+room:
+  id: "REPLACE_WITH_ROOM_ID"
+net:
+  transport: vp8channel
+  dns: "8.8.8.8:53"
+vp8:
+  fps: 30
+  batch_size: 64

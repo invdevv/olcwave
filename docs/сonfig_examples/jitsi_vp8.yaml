@@ -1,0 +1,10 @@
+auth:
+  provider: jitsi
+room:
+  id: "https://meet.example.org"
+net:
+  transport: vp8channel
+  dns: "8.8.8.8:53"
+vp8:
+  fps: 30
+  batch_size: 64
