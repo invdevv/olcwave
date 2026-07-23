@@ -12,6 +12,8 @@ class Profiles:
     def validate(config: str):
         profile_obj: dict = yaml.safe_load(config)  
 
+        profile_obj['mode'] = "srv"
+
         if profile_obj.get('socks', None):
             profile_obj.pop('socks')
         
