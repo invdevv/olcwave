@@ -3,7 +3,7 @@ from typing import Sequence
 from fastapi import HTTPException, status
 from datetime import datetime
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, update, exists as sa_exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from users.models import User
@@ -14,6 +14,7 @@ class UserDB:
     async def add(db: AsyncSession, data: UserSchema) -> User:
         user = User(
             short_uuid = data.short_uuid,
+            name = data.name,
             expires_at = data.expires_at,
             traffic_limit_bytes = data.traffic_limit_bytes,
             traffic_used_bytes = data.traffic_used_bytes,
@@ -62,6 +63,13 @@ class UserDB:
             )
 
         return [UserSchema.model_validate(user) for user in users]
+
+    @staticmethod
+    async def exists(db: AsyncSession, short_uuid: str) -> bool:
+        result = await db.execute(
+            sa_exists(select(User).where(User.short_uuid == short_uuid)).select()
+        )
+        return result.scalar_one()
 
     @staticmethod
     async def update_traffic_used(db: AsyncSession, short_uuid: str, delta: int) -> None:

@@ -8,7 +8,12 @@ class Users:
     @staticmethod
     async def add(user: UserSchema):
         async with async_session_factory() as db:
-            _ = await UserDB.add(db, user)
+            return await UserDB.add(db, user)
+
+    @staticmethod
+    async def exists(short_uuid: str) -> bool:
+        async with async_session_factory() as db:
+            return await UserDB.exists(db, short_uuid)
 
     @staticmethod
     async def get(short_uuid: str) -> UserSchema:

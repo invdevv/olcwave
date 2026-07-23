@@ -13,6 +13,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     short_uuid: Mapped[str] = mapped_column(String(32), unique=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[UTC_NOW]  # pyright: ignore[reportUninitializedInstanceVariable]
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # pyright: ignore[reportUninitializedInstanceVariable]
     traffic_limit_bytes: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))

@@ -10,10 +10,16 @@ export interface TokenResponse {
 
 export interface User {
   short_uuid: string
+  name?: string | null
   created_at: string
   expires_at: string
   traffic_limit_bytes: number
   traffic_used_bytes: number
+}
+
+export interface SyncResult {
+  created: number
+  skipped: number
 }
 
 export interface Profile {

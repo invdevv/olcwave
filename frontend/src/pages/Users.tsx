@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { usersApi } from '../api/users'
-import type { User } from '../types'
+import type { User, SyncResult } from '../types'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Input from '../components/ui/Input'
@@ -46,11 +46,23 @@ export default function Users() {
     },
   })
 
+  const syncMutation = useMutation({
+    mutationFn: () => usersApi.syncWithRemnawave().then((r) => r.data),
+    onSuccess: (data: SyncResult) => {
+      queryClient.invalidateQueries({ queryKey: ['users-all'] })
+      success(`Imported ${data.created} users\nSkipped ${data.skipped} existing users`)
+    },
+    onError: (err) => {
+      toastError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to sync with Remnawave')
+    },
+  })
+
   const filtered = useMemo(() => {
     if (!users) return []
     const q = search.toLowerCase()
     return users.filter(
       (u) =>
+        (u.name || '').toLowerCase().includes(q) ||
         u.short_uuid.toLowerCase().includes(q) ||
         u.created_at.toLowerCase().includes(q) ||
         u.expires_at.toLowerCase().includes(q)
@@ -77,6 +89,10 @@ export default function Users() {
         </div>
         <span className="text-xs text-text-muted tabular-nums">{filtered.length} users</span>
         <AutoRefreshSelect value={refreshMs} onChange={setRefreshMs} />
+        <Button variant="secondary" onClick={() => syncMutation.mutate()} loading={syncMutation.isPending} disabled={syncMutation.isPending}>
+          <ArrowPathIcon className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+          Sync with Remnawave
+        </Button>
         <Button variant="secondary" onClick={() => refetch()}>
           <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
@@ -96,7 +112,7 @@ export default function Users() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left bg-bg-tertiary/40">
-                  <Th>Short UUID</Th>
+                  <Th>Name / Short UUID</Th>
                   <Th>Created</Th>
                   <Th>Expires</Th>
                   <Th>Traffic</Th>
@@ -214,14 +230,34 @@ function UserRow({
     >
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
-          <code className="text-xs font-mono text-accent">{user.short_uuid}</code>
-          <button
-            onClick={copyUuid}
-            className="text-text-muted hover:text-text-primary sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer"
-            title="Copy UUID"
-          >
-            {copied ? <CheckIcon className="w-3.5 h-3.5 text-success" /> : <ClipboardDocumentIcon className="w-3.5 h-3.5" />}
-          </button>
+          <div className="min-w-0">
+            {user.name ? (
+              <>
+                <div className="text-sm font-medium text-text-primary truncate max-w-[200px]">{user.name}</div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <code className="text-[11px] font-mono text-text-muted">{user.short_uuid}</code>
+                  <button
+                    onClick={copyUuid}
+                    className="text-text-muted hover:text-text-primary transition-all cursor-pointer shrink-0"
+                    title="Copy UUID"
+                  >
+                    {copied ? <CheckIcon className="w-3 h-3 text-success" /> : <ClipboardDocumentIcon className="w-3 h-3" />}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-mono text-accent">{user.short_uuid}</code>
+                <button
+                  onClick={copyUuid}
+                  className="text-text-muted hover:text-text-primary sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer"
+                  title="Copy UUID"
+                >
+                  {copied ? <CheckIcon className="w-3.5 h-3.5 text-success" /> : <ClipboardDocumentIcon className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </td>
       <td className="px-5 py-3 text-xs text-text-secondary whitespace-nowrap">{created.toLocaleDateString()} {created.toLocaleTimeString()}</td>

@@ -182,7 +182,7 @@ class Subscriptions:
         try:
             _=await Users.get(short_uuid)
         except Exception:
-            user = UserSchema(short_uuid=short_uuid, expires_at=rw_sub.user.expires_at)
+            user = UserSchema(short_uuid=short_uuid, name=rw_sub.user.username, expires_at=rw_sub.user.expires_at)
             await Users.add(user)
 
         # Block subscription if traffic limit exceeded

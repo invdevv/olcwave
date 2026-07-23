@@ -1,5 +1,5 @@
 import api from './client'
-import type { User, TrafficInfo } from '../types'
+import type { User, TrafficInfo, SyncResult } from '../types'
 
 export const usersApi = {
   getAll: () =>
@@ -7,6 +7,9 @@ export const usersApi = {
 
   getByShortUuid: (shortUuid: string) =>
     api.get<User>('/users/', { params: { short_uuid: shortUuid } }),
+
+  create: (data: Partial<User> & { short_uuid: string; expires_at: string }) =>
+    api.post<User>('/users/', data),
 
   update: (shortUuid: string, expiresAt: string) =>
     api<boolean>('/users/', {
@@ -32,4 +35,7 @@ export const usersApi = {
     api.post<TrafficInfo>('/users/traffic/reset', null, {
       params: { short_uuid: shortUuid },
     }),
+
+  syncWithRemnawave: () =>
+    api.post<SyncResult>('/users/sync'),
 }

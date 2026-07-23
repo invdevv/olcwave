@@ -6,6 +6,7 @@ from config import settings
 
 class UserSchema(BaseModel):
     short_uuid: str = Field(max_length=255)
+    name: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(default = datetime.now(timezone.utc))
     expires_at: datetime = Field(default = datetime(year=1971, month=1, day=1, hour=5, tzinfo=timezone.utc))
     traffic_limit_bytes: int = Field(default_factory=lambda: settings.DEFAULT_TRAFFIC_LIMIT)
