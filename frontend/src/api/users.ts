@@ -11,11 +11,8 @@ export const usersApi = {
   create: (data: Partial<User> & { short_uuid: string; expires_at: string }) =>
     api.post<User>('/users/', data),
 
-  update: (shortUuid: string, expiresAt: string) =>
-    api<boolean>('/users/', {
-      params: { short_uuid: shortUuid, expires_at: expiresAt },
-      method: 'PUT',
-    }),
+  update: (shortUuid: string, data: Record<string, unknown>) =>
+    api.put<User>('/users/', { short_uuid: shortUuid, ...data }),
 
   delete: (shortUuid: string) =>
     api<boolean>('/users/', {

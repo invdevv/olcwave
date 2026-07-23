@@ -19,7 +19,8 @@ export interface User {
 
 export interface SyncResult {
   created: number
-  skipped: number
+  updated: number
+  deleted: number
 }
 
 export interface Profile {

@@ -22,12 +22,14 @@ import {
   ClipboardDocumentIcon,
   CheckIcon,
   LinkIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline'
 
 export default function Users() {
   const [search, setSearch] = useState('')
   const [editUser, setEditUser] = useState<User | null>(null)
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
   const [refreshMs, setRefreshMs] = useAutoRefresh('users')
   const { toasts, dismiss, success, error: toastError } = useToasts()
   const queryClient = useQueryClient()
@@ -50,7 +52,7 @@ export default function Users() {
     mutationFn: () => usersApi.syncWithRemnawave().then((r) => r.data),
     onSuccess: (data: SyncResult) => {
       queryClient.invalidateQueries({ queryKey: ['users-all'] })
-      success(`Imported ${data.created} users\nSkipped ${data.skipped} existing users`)
+      success(`Created ${data.created}, updated ${data.updated}, deleted ${data.deleted}`)
     },
     onError: (err) => {
       toastError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to sync with Remnawave')
@@ -89,6 +91,10 @@ export default function Users() {
         </div>
         <span className="text-xs text-text-muted tabular-nums">{filtered.length} users</span>
         <AutoRefreshSelect value={refreshMs} onChange={setRefreshMs} />
+        <Button variant="secondary" onClick={() => setCreateOpen(true)}>
+          <PlusIcon className="w-4 h-4" />
+          Create User
+        </Button>
         <Button variant="secondary" onClick={() => syncMutation.mutate()} loading={syncMutation.isPending} disabled={syncMutation.isPending}>
           <ArrowPathIcon className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
           Sync with Remnawave
@@ -159,6 +165,16 @@ export default function Users() {
         </Card>
       )}
 
+      <CreateUserModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={(msg) => {
+          queryClient.invalidateQueries({ queryKey: ['users-all'] })
+          setCreateOpen(false)
+          success(msg)
+        }}
+        onError={toastError}
+      />
       <UserEditModal
         user={editUser}
         onClose={() => setEditUser(null)}
@@ -328,6 +344,7 @@ function UserEditModal({
   onError: (message: string) => void
 }) {
   const queryClient = useQueryClient()
+  const [name, setName] = useState('')
   const [expiry, setExpiry] = useState('')
   const [limitGb, setLimitGb] = useState('')
   const [unlimited, setUnlimited] = useState(false)
@@ -341,7 +358,10 @@ function UserEditModal({
   })
 
   useEffect(() => {
-    if (user) setExpiry(user.expires_at.slice(0, 16))
+    if (user) {
+      setName(user.name || '')
+      setExpiry(user.expires_at.slice(0, 16))
+    }
     setConfirmReset(false)
     setConfirmDelete(false)
   }, [user])
@@ -364,8 +384,12 @@ function UserEditModal({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const bytes = unlimited ? 0 : gbToBytes(parseFloat(limitGb) || 0)
-      await usersApi.update(user!.short_uuid, new Date(expiry).toISOString())
-      await usersApi.setTrafficLimit(user!.short_uuid, bytes)
+      await usersApi.update(user!.short_uuid, {
+        name: name || null,
+        expires_at: new Date(expiry).toISOString(),
+        traffic_limit_bytes: bytes,
+        traffic_used_bytes: user!.traffic_used_bytes,
+      })
     },
     onSuccess: () => {
       invalidate()
@@ -402,7 +426,7 @@ function UserEditModal({
   const busy = saveMutation.isPending || deleteMutation.isPending
 
   return (
-    <Modal open={!!user} onClose={onClose} title="Edit User" description={user.short_uuid} wide>
+    <Modal open={!!user} onClose={onClose} title="Edit User" description={user.name || user.short_uuid} wide>
       <div className="space-y-5">
         {/* User information */}
         <div className="space-y-2.5">
@@ -410,6 +434,15 @@ function UserEditModal({
           <div className="bg-bg-tertiary border border-border rounded-lg divide-y divide-border">
             <InfoRow label="UUID">
               <code className="text-sm font-mono text-accent">{user.short_uuid}</code>
+            </InfoRow>
+            <InfoRow label="Name">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Display name"
+                className="w-48 h-7 bg-bg-secondary border border-border rounded px-2 text-xs text-text-primary
+                  placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 text-right"
+              />
             </InfoRow>
             <InfoRow label="Subscription">
               <button
@@ -534,5 +567,74 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
       <span className="text-xs text-text-muted">{label}</span>
       {children}
     </div>
+  )
+}
+
+function CreateUserModal({
+  open,
+  onClose,
+  onSuccess,
+  onError,
+}: {
+  open: boolean
+  onClose: () => void
+  onSuccess: (message: string) => void
+  onError: (message: string) => void
+}) {
+  const [shortUuid, setShortUuid] = useState('')
+  const [name, setName] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      usersApi.create({
+        short_uuid: shortUuid,
+        name: name || undefined,
+        expires_at: new Date(expiresAt).toISOString(),
+      }),
+    onSuccess: () => {
+      onSuccess(`User ${shortUuid} created`)
+      setShortUuid('')
+      setName('')
+      setExpiresAt('')
+      onClose()
+    },
+    onError: (err) => {
+      onError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to create user')
+    },
+  })
+
+  const valid = shortUuid.trim() && expiresAt
+
+  return (
+    <Modal open={open} onClose={onClose} title="Create User">
+      <div className="space-y-4">
+        <Input
+          label="Short UUID *"
+          value={shortUuid}
+          onChange={(e) => setShortUuid(e.target.value)}
+          placeholder="e.g. 8f4a3bc2"
+        />
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. John Smith"
+          hint="Display name (optional)"
+        />
+        <Input
+          label="Expires at *"
+          type="datetime-local"
+          value={expiresAt}
+          onChange={(e) => setExpiresAt(e.target.value)}
+        />
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending} disabled={!valid}>
+            Create
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
