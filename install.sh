@@ -121,6 +121,51 @@ build_olcrtc(){
   cd ../..
 }
 
+enable_swapfile() {
+    local SWAPFILE="/swapfile"
+    local SIZE_GB=4
+    local MIN_RAM_KB=$((SIZE_GB * 1000 * 1000))
+
+    local TOTAL_RAM_KB
+    TOTAL_RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+
+    if [ "$TOTAL_RAM_KB" -ge "$MIN_RAM_KB" ]; then
+        info "RAM >= ${SIZE_GB}GB, skipping swap creation"
+        return 0
+    fi
+
+    if swapon --show --noheadings | grep -q .; then
+        info "Swap already exists, skipping"
+        swapon --show
+        return 0
+    fi
+
+    info "RAM < ${SIZE_GB}GB and no swap found, creating ${SIZE_GB}GB swapfile..."
+
+    if [ -e "$SWAPFILE" ]; then
+        info "${SWAPFILE} already exists but is not active, skipping"
+        return 0
+    fi
+
+    dd if=/dev/zero \
+       of="$SWAPFILE" \
+       bs=1M \
+       count=$((SIZE_GB * 1024)) \
+       status=progress
+
+    chmod 600 "$SWAPFILE"
+
+    mkswap "$SWAPFILE"
+    swapon "$SWAPFILE"
+
+    if ! grep -q "^$SWAPFILE " /etc/fstab; then
+        echo "$SWAPFILE none swap sw 0 0" >> /etc/fstab
+    fi
+
+    success "Swap enabled:"
+    free -h
+}
+
 # ---------------------------------------------------------------------------
 # 1. Dependency checks and installs
 # ---------------------------------------------------------------------------
@@ -141,7 +186,6 @@ install_docker() {
   success "Docker installed."
 }
 
-
 install_nodejs() {
   info "Installing Node.js..."
 
@@ -158,7 +202,6 @@ install_nodejs() {
 
   success "Node.js installed."
 }
-
 
 check_dependencies() {
   info "Checking prerequisites..."
@@ -365,6 +408,7 @@ print_summary() {
 # ---------------------------------------------------------------------------
 main() {
   require_root
+  enable_swapfile
   install_base_packages
   check_dependencies
   collect_input
