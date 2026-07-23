@@ -4,6 +4,7 @@ import { settingsApi, type RuntimeSettings } from '../api/settings'
 import { useAuthStore } from '../store/auth'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import { Card, CardHeader } from '../components/ui/Misc'
 import { ToastContainer } from '../components/containers/Toast'
 import { useToasts } from '../components/containers/useToasts'
@@ -13,9 +14,28 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 
+const SYNC_OPTIONS = [
+  { value: '30s', label: 'Every 30 seconds' },
+  { value: '5m', label: 'Every 5 minutes' },
+  { value: '1h', label: 'Every hour' },
+  { value: '4h', label: 'Every 4 hours' },
+  { value: '12h', label: 'Every 12 hours' },
+  { value: '24h', label: 'Once a day' },
+  { value: '__other__', label: 'Other' },
+]
+
+function isValidInterval(val: string): boolean {
+  return /^[1-9]\d*[smh]$/.test(val)
+}
+
+function formatDatetime(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString()
+}
+
 export default function Settings() {
   const logout = useAuthStore((s) => s.logout)
-  const apiUrl = import.meta.env.VITE_API_URL
   const { toasts, dismiss, success, error: toastError } = useToasts()
   const queryClient = useQueryClient()
 
@@ -27,6 +47,9 @@ export default function Settings() {
   const [subName, setSubName] = useState('')
   const [defaultTrafficGb, setDefaultTrafficGb] = useState('')
   const [collectInterval, setCollectInterval] = useState('')
+  const [syncInterval, setSyncInterval] = useState('1h')
+  const [customSync, setCustomSync] = useState('')
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
   useEffect(() => {
     if (!settings) return
@@ -34,6 +57,9 @@ export default function Settings() {
     setSubName(settings.sub_name)
     setDefaultTrafficGb(bytesToGB(settings.default_traffic_limit).toFixed(2))
     setCollectInterval(String(settings.traffic_collect_interval))
+    setSyncInterval(settings.sync_interval)
+    setCustomSync('')
+    setLastSyncAt(settings.last_sync_at)
   }, [settings])
 
   const saveMutation = useMutation({
@@ -50,12 +76,25 @@ export default function Settings() {
     },
   })
 
+  const isCustom = !SYNC_OPTIONS.some((o) => o.value === syncInterval)
+  const effectiveSync = isCustom ? customSync : syncInterval
+  const syncError = isCustom && customSync && !isValidInterval(customSync) ? 'Invalid format. Use number + s/m/h (e.g. 10m, 4h).' : ''
+
   const handleSave = () => {
     saveMutation.mutate({
       sub_name: subName,
       default_traffic_limit: gbToBytes(parseFloat(defaultTrafficGb) || 0),
       traffic_collect_interval: parseInt(collectInterval, 10) || 10,
+      sync_interval: effectiveSync || '1h',
+      last_sync_at: lastSyncAt,
     })
+  }
+
+  const handleSyncSelect = (value: string) => {
+    setSyncInterval(value)
+    if (value !== '__other__') {
+      setCustomSync('')
+    }
   }
 
   return (
@@ -101,21 +140,42 @@ export default function Settings() {
         </div>
       </Card>
 
-      {/* <Card>
-        <CardHeader title="Application" />
-        <div className="px-5 py-2">
-          <Row label="API Base URL" value={apiUrl} mono />
-          <Row label="Admin User" value="admin" />
-          <Row label="Token Storage" value="localStorage" last />
+      <Card>
+        <CardHeader title="Remnawave synchronization" />
+        <div className="px-5 py-4 space-y-4">
+          <Select
+            label="Auto sync users"
+            options={SYNC_OPTIONS}
+            value={isCustom ? '__other__' : syncInterval}
+            onChange={(e) => handleSyncSelect(e.target.value)}
+            disabled={isLoading}
+          />
+          {isCustom && (
+            <Input
+              label="Custom interval"
+              value={customSync}
+              onChange={(e) => setCustomSync(e.target.value)}
+              placeholder="e.g. 10m"
+              error={syncError}
+              hint={'Format: number + time unit.\n30s - seconds\n10m - minutes\n4h - hours'}
+              disabled={isLoading}
+            />
+          )}
+          <div className="flex items-center justify-between gap-4 py-2 border-t border-border">
+            <span className="text-xs text-text-muted">Last sync</span>
+            <span className="text-xs text-text-primary tabular-nums">{formatDatetime(lastSyncAt)}</span>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button
+              onClick={handleSave}
+              loading={saveMutation.isPending}
+              disabled={isLoading || !!syncError}
+            >
+              Save settings
+            </Button>
+          </div>
         </div>
       </Card>
-
-      <Card>
-        <CardHeader title="Session" />
-        <div className="px-5 py-2">
-          <Row label="Token Expiry" value="24 hours" last />
-        </div>
-      </Card> */}
 
       <Card className="border-danger/20">
         <div className="px-5 py-3.5 border-b border-danger/20 flex items-center gap-2">
@@ -135,15 +195,6 @@ export default function Settings() {
       </Card>
 
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
-    </div>
-  )
-}
-
-function Row({ label, value, mono, last }: { label: string; value: string; mono?: boolean; last?: boolean }) {
-  return (
-    <div className={`flex items-center justify-between gap-4 py-3 ${last ? '' : 'border-b border-border'}`}>
-      <span className="text-sm text-text-secondary">{label}</span>
-      <span className={`text-sm text-text-primary text-right truncate ${mono ? 'font-mono' : ''}`}>{value}</span>
     </div>
   )
 }

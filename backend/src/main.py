@@ -15,12 +15,14 @@ from olcrtc.router import router as containers_router
 from config import settings
 from database import create_tables
 from traffic import TrafficManager
+from sync import SyncManager
 
 
 async def lifespan(app: FastAPI):
     await create_tables() # TODO: add alembic migrations
     await SettingsService.load()
 
+    SyncManager.start()
     task = asyncio.create_task(TrafficManager.run())
     yield
     task.cancel()
@@ -28,6 +30,7 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
+    await SyncManager.stop()
 
 app = FastAPI(lifespan=lifespan)  # pyright: ignore[reportArgumentType]
 

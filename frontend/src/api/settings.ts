@@ -4,6 +4,8 @@ export interface RuntimeSettings {
   sub_name: string
   default_traffic_limit: number
   traffic_collect_interval: number
+  sync_interval: string
+  last_sync_at: string | null
 }
 
 export const settingsApi = {

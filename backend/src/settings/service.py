@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from settings.models import SettingsModel
 from settings.schemas import RuntimeSettings
 from database import async_session_factory
@@ -18,7 +20,7 @@ class SettingsService:
             obj = await db.get(SettingsModel, 1)
 
             if obj is None:
-                obj = SettingsModel(id=1, data=RuntimeSettings().model_dump())
+                obj = SettingsModel(id=1, data=RuntimeSettings().model_dump(mode="json"))
                 db.add(obj)
                 await db.commit()
 
@@ -32,9 +34,21 @@ class SettingsService:
             obj = await db.get(SettingsModel, 1)
 
             if obj is None:
-                obj = SettingsModel(id=1, data=settings.model_dump())
+                obj = SettingsModel(id=1, data=settings.model_dump(mode="json"))
                 db.add(obj)
             else:
-                obj.data = settings.model_dump()
+                obj.data = settings.model_dump(mode="json")
 
             await db.commit()
+
+    @staticmethod
+    async def update_last_sync(dt: datetime):
+        if SettingsService._settings is None:
+            return
+        SettingsService._settings.last_sync_at = dt
+
+        async with async_session_factory() as db:
+            obj = await db.get(SettingsModel, 1)
+            if obj is not None:
+                obj.data = SettingsService._settings.model_dump(mode="json")
+                await db.commit()
