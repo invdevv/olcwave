@@ -271,7 +271,7 @@ write_frontend_env() {
   } > frontend/.env
   success "Wrote frontend/.env"
 }
-
+  
 write_caddyfile() {
   info "Generating caddy/Caddyfile..."
 

@@ -5,3 +5,4 @@ __pycache__
 temp.txt
 .utils
 .ruff_cache
+pyrightconfig.json
