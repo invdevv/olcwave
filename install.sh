@@ -187,42 +187,42 @@ check_dependencies() {
 # 2. Collect configuration from the user
 # ---------------------------------------------------------------------------
 collect_input() {
-  info "Configuration - answer the prompts below. Defaults are shown in [brackets]."
+  info "Configuration - answer the prompts below."
   printf '\n' > /dev/tty
 
-  ask          SUB_NAME  "Subscription name"            "OLCWave"
-  ask_required RW_API_URL    "Remnawave URL (e.g. https://rw.example.com)"
-  ask_secret   RW_API_TOKEN  "Remnawave API token (hidden)"
+  SUB_NAME="OLCWave"
 
-  ask          ADMIN_USERNAME "Admin username"          "admin"
+  ask_required RW_DOMAIN "Remnawave domain (e.g. remnawave.example.com)"
+  RW_API_URL="https://${RW_DOMAIN}"
+
+  ask_required RW_API_TOKEN "Remnawave API token"
+
+  ask ADMIN_USERNAME "Admin username" "admin"
 
   JWT_SECRET_KEY="$(generate_secret)"
   ADMIN_PASSWORD="$(generate_secret)"
 
-  # Traffic limit is asked in GB and converted to bytes. 0 = unlimited.
   while :; do
     ask TRAFFIC_GB "Default traffic limit in GB (0 = unlimited)" "100"
     case "$TRAFFIC_GB" in
-      *[!0-9]* | '') warn "Enter a whole number of gigabytes (e.g. 100)." ;;
+      *[!0-9]*|'') warn "Enter a whole number of gigabytes (e.g. 100)." ;;
       *) break ;;
     esac
   done
+
   DEFAULT_TRAFFIC_LIMIT=$(( TRAFFIC_GB * 1024 * 1024 * 1024 ))
 
   ask TRAFFIC_COLLECT_INTERVAL "Traffic collection interval (seconds)" "10"
 
-  # Panel URL drives the frontend. Caddy strips /api, so VITE_API_URL = <panel>/api.
-  ask_required PANEL_URL "OLCWave Panel URL (e.g. https://panel.example.com)"
-  PANEL_URL="${PANEL_URL%/}"                       # drop trailing slash
-  VITE_API_URL="${PANEL_URL}/api"
+  ask_required PANEL_DOMAIN "OLCWave Panel domain (e.g. olcwave.example.com)"
+  PANEL_URL="https://${PANEL_DOMAIN}"
+  VITE_API_URL="https://${PANEL_DOMAIN}/api"
 
-  PANEL_DOMAIN="${PANEL_URL#https://}"
-  PANEL_DOMAIN="${PANEL_DOMAIN#http://}"
+  ROOT_DOMAIN="$(awk -F. '{if (NF > 2) print $(NF-1)"."$NF; else print}' <<< "$DOMAIN")"
 
-  ask SUB_DOMAIN "Subscription domain (e.g. sub.example.com)" "sub.${PANEL_DOMAIN}"
-  SUB_URL_TEMPLATE="https://$SUB_DOMAIN/{uuid}"
+  ask SUB_DOMAIN "Subscription domain (e.g. sub.example.com)" "olcsub.${ROOT_DOMAIN}"
+  SUB_URL_TEMPLATE="https://${SUB_DOMAIN}/{uuid}"
 
-  # Postgres credentials are generated, not asked. They are written identically
   POSTGRES_USER="olcwave"
   POSTGRES_DB="main"
   POSTGRES_PASSWORD="$(generate_secret)"
