@@ -14,8 +14,6 @@ class SettingsService:
 
     @staticmethod
     async def load():
-        global _settings
-
         async with async_session_factory() as db:
             obj = await db.get(SettingsModel, 1)
 
@@ -24,13 +22,11 @@ class SettingsService:
                 db.add(obj)
                 await db.commit()
 
-        _settings = RuntimeSettings.model_validate(obj.data)
+        SettingsService._settings = RuntimeSettings.model_validate(obj.data)
 
     @staticmethod
     async def set(settings: RuntimeSettings):
-        global _settings
-
-        _settings = settings
+        SettingsService._settings = settings
 
         async with async_session_factory() as db:
             obj = await db.get(SettingsModel, 1)

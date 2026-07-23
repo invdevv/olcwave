@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from settings.service import SettingsService
+from settings.router import router as settings_router
 from auth.router import router as auth_router
 from profiles.router import router as configs_router
 from users.router import router as users_router
@@ -43,6 +44,7 @@ app.include_router(configs_router)
 app.include_router(users_router)
 app.include_router(subscriptions_router)
 app.include_router(containers_router)
+app.include_router(settings_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0")
