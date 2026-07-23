@@ -48,7 +48,7 @@ olcwave-<profile.tag>-<user.short_uuid>
 например:
 
 ```
-olcwave-de-vp8-rfWMHbDFsH_cPXRz
+olcwave-de_vp8-rfWMHbDFsH_cPXRz
 ```
 
 Это имя не просто для красоты - система трафика разбирает его, чтобы определить владельца пользователя (`split("-")` должен вернуть ровно три части).
