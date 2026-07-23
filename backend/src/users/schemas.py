@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
 
-from config import settings
+from settings.service import SettingsService
 
 
 class UserSchema(BaseModel):
@@ -9,7 +9,7 @@ class UserSchema(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(default = datetime.now(timezone.utc))
     expires_at: datetime = Field(default = datetime(year=1971, month=1, day=1, hour=5, tzinfo=timezone.utc))
-    traffic_limit_bytes: int = Field(default_factory=lambda: settings.DEFAULT_TRAFFIC_LIMIT)
+    traffic_limit_bytes: int = Field(default_factory=lambda: SettingsService.get().default_traffic_limit)
     traffic_used_bytes: int = Field(default=0)
 
     model_config = ConfigDict(from_attributes=True)

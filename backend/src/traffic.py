@@ -1,6 +1,6 @@
 import asyncio
 
-from config import settings
+from settings.service import SettingsService
 from olcrtc.sdk import OlcRTC
 from olcrtc.service import Containers
 from users.service import Users
@@ -94,4 +94,4 @@ class TrafficManager:
                 raise
             except Exception:
                 pass
-            await asyncio.sleep(settings.TRAFFIC_COLLECT_INTERVAL)
+            await asyncio.sleep(SettingsService.get().traffic_collect_interval)

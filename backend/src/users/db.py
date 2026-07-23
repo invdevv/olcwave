@@ -12,13 +12,7 @@ from users.schemas import UserSchema
 class UserDB:
     @staticmethod
     async def add(db: AsyncSession, data: UserSchema) -> User:
-        user = User(
-            short_uuid = data.short_uuid,
-            name = data.name,
-            expires_at = data.expires_at,
-            traffic_limit_bytes = data.traffic_limit_bytes,
-            traffic_used_bytes = data.traffic_used_bytes,
-        )
+        user = User(**data.model_dump())
 
         db.add(user)
         await db.commit()
@@ -39,12 +33,16 @@ class UserDB:
         return UserSchema.model_validate(user)
 
     @staticmethod
-    async def update(db: AsyncSession, short_uuid: str, expires_at: datetime) -> bool:
-        _ = await db.execute(update(User).where(User.short_uuid == short_uuid).values(expires_at=expires_at))
+    async def update(db: AsyncSession, user: UserSchema) -> bool:
+        await db.execute(
+            update(User)
+            .where(User.short_uuid == user.short_uuid)
+            .values(**user.model_dump(exclude={"short_uuid"}))
+        )
         await db.commit()
-    
+
         return True
-    
+        
     @staticmethod
     async def delete(db: AsyncSession, short_uuid: str) -> bool:
         _= await db.execute(delete(User).where(User.short_uuid == short_uuid))

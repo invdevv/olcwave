@@ -19,8 +19,8 @@ async def create(body: UserSchema, _admin: dict = Depends(get_current_admin)):
     return user
 
 @router.put("/")
-async def update(short_uuid: str, expires_at: datetime, _admin: dict = Depends(get_current_admin)):
-    user = await Users.update(short_uuid, expires_at)
+async def update(body: UserSchema, _admin: dict = Depends(get_current_admin)):
+    user = await Users.update(body)
     return user
 
 @router.delete("/")
@@ -50,21 +50,6 @@ async def reset_traffic(short_uuid: str, _admin: dict = Depends(get_current_admi
 
 @router.post("/sync")
 async def sync_from_remnawave(_admin: dict = Depends(get_current_admin)):
-    rw_users = await getAllUsers()
-    created = 0
-    skipped = 0
+    res = await Users.sync_with_remnawave()
 
-    for rw_user in rw_users.users:
-        if await Users.exists(rw_user.short_uuid):
-            skipped += 1
-            continue
-
-        user = UserSchema(
-            short_uuid=rw_user.short_uuid,
-            name=rw_user.username,
-            expires_at=rw_user.expire_at,
-        )
-        await Users.add(user)
-        created += 1
-
-    return {"created": created, "skipped": skipped}
+    return res

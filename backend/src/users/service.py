@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from rw.sdk import getAllUsers
 from database import async_session_factory
 from users.db import UserDB
 from users.schemas import UserSchema, TrafficInfoSchema
@@ -22,9 +23,9 @@ class Users:
         return user
 
     @staticmethod
-    async def update(short_uuid: str, expires_at: datetime):
+    async def update(user: UserSchema):
         async with async_session_factory() as db:
-            _ = await UserDB.update(db, short_uuid, expires_at)
+            _ = await UserDB.update(db, user)
 
     @staticmethod
     async def delete(short_uuid: str):
@@ -68,3 +69,52 @@ class Users:
             return
         async with async_session_factory() as db:
             await UserDB.update_traffic_used(db, short_uuid, delta)
+
+    @staticmethod
+    async def sync_with_remnawave():
+        rw_users = await getAllUsers()
+        db_users = await Users.get_all()
+
+        rw_map = {u.short_uuid: u for u in rw_users.users}  # pyright: ignore[reportAttributeAccessIssue]
+        db_map = {u.short_uuid: u for u in db_users}
+
+        created = 0
+        updated = 0
+        deleted = 0
+
+        for short_uuid, rw_user in rw_map.items():
+            if short_uuid not in db_map:
+                await Users.add(
+                    UserSchema(
+                        short_uuid=rw_user.short_uuid,
+                        name=rw_user.username,
+                        expires_at=rw_user.expire_at,
+                    )
+                )
+                created += 1
+            else:
+                db_user = db_map[short_uuid]
+
+                if (
+                    db_user.expires_at != rw_user.expire_at
+                    or db_user.name != rw_user.username
+                ):
+                    await Users.update(
+                        UserSchema(
+                            short_uuid=rw_user.short_uuid,
+                            name=rw_user.username,
+                            expires_at=rw_user.expire_at,
+                        ),
+                    )
+                    updated += 1
+
+        for short_uuid in db_map:
+            if short_uuid not in rw_map:
+                await Users.delete(short_uuid)
+                deleted += 1
+
+        return {
+            "created": created,
+            "updated": updated,
+            "deleted": deleted,
+        }

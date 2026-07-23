@@ -3,7 +3,7 @@ import hashlib
 import json
 from fastapi import Response
 
-from config import settings
+from settings.service import SettingsService
 from users.schemas import UserSchema
 from olcrtc.sdk import OlcRTC
 from profiles.service import Profiles
@@ -209,7 +209,7 @@ net:
             return Response(
                 content=Subscriptions.prepare_sub_text(
                     [traffic_uri],
-                    settings.NAME,
+                    SettingsService().get().sub_name,
                     traffic.used,
                     traffic.limit - traffic.used
                 ),

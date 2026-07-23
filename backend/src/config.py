@@ -1,8 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    NAME: str
-    
     RW_API_URL: str
     RW_API_TOKEN: str
 
@@ -21,12 +19,6 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str
     JWT_EXPIRE_MINUTES: int = 1440
-
-    # Default traffic limit applied to new users, in bytes. Set 0 for unlimited.
-    DEFAULT_TRAFFIC_LIMIT: int
-
-    # Interval (seconds) for the background traffic collection loop.
-    TRAFFIC_COLLECT_INTERVAL: int
 
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
