@@ -233,8 +233,6 @@ collect_input() {
   info "Configuration - answer the prompts below."
   printf '\n' > /dev/tty
 
-  SUB_NAME="OLCWave"
-
   ask_required RW_DOMAIN "Remnawave domain (e.g. remnawave.example.com)"
   RW_API_URL="https://${RW_DOMAIN}"
 
@@ -245,23 +243,11 @@ collect_input() {
   JWT_SECRET_KEY="$(generate_secret)"
   ADMIN_PASSWORD="$(generate_secret)"
 
-  while :; do
-    ask TRAFFIC_GB "Default traffic limit in GB (0 = unlimited)" "100"
-    case "$TRAFFIC_GB" in
-      *[!0-9]*|'') warn "Enter a whole number of gigabytes (e.g. 100)." ;;
-      *) break ;;
-    esac
-  done
-
-  DEFAULT_TRAFFIC_LIMIT=$(( TRAFFIC_GB * 1024 * 1024 * 1024 ))
-
-  ask TRAFFIC_COLLECT_INTERVAL "Traffic collection interval (seconds)" "10"
-
   ask_required PANEL_DOMAIN "OLCWave Panel domain (e.g. olcwave.example.com)"
   PANEL_URL="https://${PANEL_DOMAIN}"
   VITE_API_URL="https://${PANEL_DOMAIN}/api"
 
-  ROOT_DOMAIN="$(awk -F. '{if (NF > 2) print $(NF-1)"."$NF; else print}' <<< "$DOMAIN")"
+  ROOT_DOMAIN="$(awk -F. '{if (NF > 2) print $(NF-1)"."$NF; else print}' <<< "$PANEL_DOMAIN")"
 
   ask SUB_DOMAIN "Subscription domain (e.g. sub.example.com)" "olcsub.${ROOT_DOMAIN}"
   SUB_URL_TEMPLATE="https://${SUB_DOMAIN}/{uuid}"
@@ -287,7 +273,6 @@ write_backend_env() {
   may_overwrite "backend/.env" || return 0
   # printf '%s' keeps values verbatim (safe for passwords with special chars).
   {
-    printf 'NAME=%s\n\n'                     "$SUB_NAME"
     printf 'RW_API_URL=%s\n'                 "$RW_API_URL"
     printf 'RW_API_TOKEN=%s\n\n'             "$RW_API_TOKEN"
     printf 'DB_HOST=postgres\n'
@@ -299,9 +284,6 @@ write_backend_env() {
     printf 'ADMIN_PASSWORD=%s\n\n'           "$ADMIN_PASSWORD"
     printf 'JWT_SECRET_KEY=%s\n'             "$JWT_SECRET_KEY"
     printf 'JWT_EXPIRE_MINUTES=1440\n\n'
-    printf '# %s GB in bytes (0 = unlimited)\n' "$TRAFFIC_GB"
-    printf 'DEFAULT_TRAFFIC_LIMIT=%s\n'      "$DEFAULT_TRAFFIC_LIMIT"
-    printf 'TRAFFIC_COLLECT_INTERVAL=%s\n'   "$TRAFFIC_COLLECT_INTERVAL"
   } > backend/.env
   success "Wrote backend/.env"
 }

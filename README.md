@@ -20,6 +20,9 @@ OLCWave хранит шаблоны конфигураций OLCRTC (`profiles`)
 
 Для запуска нужны Docker, Docker Compose и работающий инстанс Remnawave.
 
+Рекомендую устанавливать OLCWave на чистый сервер
+**НЕ** рядом с remnawave
+
 ```bash
 git clone https://github.com/invdevv/olcwave.git
 cd olcwave
