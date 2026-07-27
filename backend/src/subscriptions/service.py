@@ -1,4 +1,3 @@
-import json
 from fastapi import Response
 from remnawave.models import SubscriptionInfoResponseDto
 
@@ -228,7 +227,10 @@ class Subscriptions:
         }
 
         for tag, config in configs.items():
-            config_json = json.loads(config)
+            # get_config() читает /tmp/olcwave/config.yaml из контейнера — это YAML,
+            # не JSON. json.loads падал на каждом повторном запросе подписки
+            # (когда контейнеры уже существуют), первый запрос всегда маскировал баг.
+            config_json = yaml.safe_load(config)
             if config_json["auth"]["provider"] in ("telemost", "wbstream"):
                 room_exists = await RoomChecker.check_room_id(
                     config_json["auth"]["provider"],
