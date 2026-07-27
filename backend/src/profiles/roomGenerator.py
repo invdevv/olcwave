@@ -127,6 +127,17 @@ class RoomChecker:
                 headers=headers,
                 json = {}
             )
-        
-        print(res.json()["uri"].split("/")[-1])
-        return res.json()["uri"].split("/")[-1]
+
+        # POST /j/{room_id} — это URL страницы для БРАУЗЕРА (HTML, страница
+        # присоединения к звонку), а не JSON API. res.json() здесь падал
+        # всегда. Публичного JSON-эндпоинта для проверки живости конкретной
+        # комнаты Телемоста у Яндекса не нашли — до тех пор считаем комнату
+        # живой при любой ошибке разбора (fail-open). Это безопасно: реальное
+        # время жизни комнаты — 24ч (проверено эмпирически полем
+        # expiration_time в ответе Яндекса при создании), плюс
+        # lifecycle.max_session_duration в самом olcrtc уже ограничивает,
+        # насколько может устареть эта информация в худшем случае.
+        try:
+            return bool(res.json()["uri"].split("/")[-1])
+        except Exception:
+            return True
