@@ -101,10 +101,22 @@ class RoomChecker:
         }
 
 
+        # /api-room/api/v2/room/{id} отдаёт 404 даже для абсолютно живых,
+        # реально подключаемых комнат — проверено прямым сравнением на одной
+        # и той же комнате. Настоящий клиент olcrtc (internal/auth/wbstream/
+        # api.go в репозитории olcrtc) для входа в комнату использует другой
+        # эндпоинт — /api-room/api/v1/room/{id}/join — он корректно отличает
+        # живые комнаты (200) от несуществующих (404, проверено на заведомо
+        # случайном room_id). Из-за сломанной проверки OLCWave считал живые
+        # WB Stream-сессии мёртвыми и сам сносил рабочие контейнеры при
+        # каждом обновлении подписки — выглядело как обрыв WB каждые
+        # ~30 минут (по факту частота совпадала с #refresh в подписке, а не
+        # с реальным временем жизни комнаты на стороне WB).
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                url = f"https://stream.wb.ru/api-room/api/v2/room/{room_id}",
+                url = f"https://stream.wb.ru/api-room/api/v1/room/{room_id}/join",
                 headers=headers,
+                json = {},
             )
 
         return res.status_code == 200
