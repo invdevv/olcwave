@@ -7,6 +7,7 @@ from database import async_session_factory
 from users.db import UserDB
 from users.schemas import UserSchema, TrafficInfoSchema
 
+
 class Users:
     @staticmethod
     async def add(user: UserSchema):
@@ -44,8 +45,10 @@ class Users:
     async def get_traffic(short_uuid: str) -> TrafficInfoSchema:
         user = await Users.get(short_uuid)
         unlimited = user.traffic_limit_bytes == 0
-        remaining = 0 if unlimited else max(0, user.traffic_limit_bytes - user.traffic_used_bytes)
-        exceeded = (not unlimited) and user.traffic_used_bytes >= user.traffic_limit_bytes
+        remaining = 0 if unlimited else max(
+            0, user.traffic_limit_bytes - user.traffic_used_bytes)
+        exceeded = (
+            not unlimited) and user.traffic_used_bytes >= user.traffic_limit_bytes
         return TrafficInfoSchema(
             short_uuid=short_uuid,
             limit=user.traffic_limit_bytes,
@@ -77,15 +80,15 @@ class Users:
         if not settings.RW_ENABLED:
             raise RuntimeError("Remnawave is not enabled")
 
-        from rw.sdk import getAllUsers, isUserInSquad
+        from rw.sdk import get_all_users, is_user_in_squad
 
-        rw_users = await getAllUsers()
+        rw_users = await get_all_users()
         db_users = await Users.get_all()
 
         rw_map = {
             u.short_uuid: u
             for u in rw_users.users
-            if isUserInSquad(u)
+            if is_user_in_squad(u)
         }
 
         db_map = {u.short_uuid: u for u in db_users}

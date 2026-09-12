@@ -10,8 +10,8 @@ router = APIRouter(prefix="/sub", tags=["subscriptions"])
 @router.get("/{short_uuid}/check")
 async def get_provider_name(short_uuid: str):
     if settings.RW_ENABLED:
-        from rw.sdk import isUserValid
-        if not await isUserValid(short_uuid):
+        from rw.sdk import get_subscription_info
+        if not await get_subscription_info(short_uuid):
             raise HTTPException(status_code=404, detail="Not found")
     else:
         try:

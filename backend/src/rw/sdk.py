@@ -1,4 +1,6 @@
 from uuid import UUID
+from functools import lru_cache
+from typing import Callable, Any
 
 from remnawave.models.users import GetAllUsersResponseDto, UserResponseDto
 from remnawave.models.users import GetUserByShortUuidResponseDto
@@ -26,36 +28,35 @@ def make_uuid_optional(model) -> None:
 
 
 def patch_remnawave_users() -> None:
-    """Patch the Remnawave SDK models to make the `uuid` field optional in certain user-related response DTOs."""
+    """
+    Patch the Remnawave SDK models to make the `uuid` 
+    field optional in certain user-related response DTOs.
+    """
     make_uuid_optional(UserResponseDto)
     make_uuid_optional(GetUserByShortUuidResponseDto)
     GetAllUsersResponseDto.model_rebuild(force=True)
 
 
-patch_remnawave_users()
-
-
-_remnawave: RemnawaveSDK | None = None
-
-
+@lru_cache
 def _get_sdk() -> RemnawaveSDK:
-    global _remnawave
-    if _remnawave is None:
-        _remnawave = RemnawaveSDK(
-            base_url=settings.RW_API_URL,
-            token=settings.RW_API_TOKEN,
-            caddy_token=settings.RW_CADDY_TOKEN or None,
-        )
-    return _remnawave
+    patch_remnawave_users()
+    return RemnawaveSDK(
+        base_url=settings.RW_API_URL,
+        token=settings.RW_API_TOKEN,
+        caddy_token=settings.RW_CADDY_TOKEN or None,
+    )
 
 
-def _ensure_enabled():
-    if not settings.RW_ENABLED:
-        raise RuntimeError("Remnawave is not enabled")
+def ensure_enabled(func) -> Callable[..., Any]:
+    def wrapper(*args, **kwargs) -> Any:
+        if not settings.RW_ENABLED:
+            raise RuntimeError("Remnawave is not enabled")
+        return func(*args, **kwargs)
+    return wrapper
 
 
-async def getAllUsers() -> GetAllUsersResponseDto:
-    _ensure_enabled()
+@ensure_enabled
+async def get_all_users() -> GetAllUsersResponseDto:
     sdk = _get_sdk()
     PAGE_SIZE = 100
 
@@ -80,41 +81,45 @@ async def getAllUsers() -> GetAllUsersResponseDto:
         total=len(users),
     )
 
-def isUserInSquad(user: UserResponseDto) -> bool:
+
+def is_user_in_squad(user: UserResponseDto) -> bool:
     if not settings.RW_SQUAD_NAME:
         return True
 
     return any(
-        settings.RW_SQUAD_NAME == squad.name or settings.RW_SQUAD_NAME == str(squad.uuid)
+        settings.RW_SQUAD_NAME == squad.name or settings.RW_SQUAD_NAME == str(
+            squad.uuid)
         for squad in user.active_internal_squads
     )
 
-async def isUserValid(short_uuid: str) -> SubscriptionInfoResponseDto | None:
-    _ensure_enabled()
+
+@ensure_enabled
+async def get_subscription_info(
+    short_uuid: str
+) -> SubscriptionInfoResponseDto | None:
     sdk = _get_sdk()
 
     try:
-        sub: GetSubscriptionInfoResponseDto = await sdk.subscription.get_subscription_info_by_short_uuid(short_uuid)  # pyright: ignore[reportAssignmentType]
+        # pyright: ignore[reportAssignmentType]
+        sub: GetSubscriptionInfoResponseDto = await sdk.subscription.get_subscription_info_by_short_uuid(short_uuid)
 
         if not sub.is_found:
             return None
 
         if settings.RW_SQUAD_NAME:
-            user: GetUserByShortUuidResponseDto = await sdk.users.get_user_by_short_uuid(short_uuid)  # pyright: ignore[reportAssignmentType]
+            # pyright: ignore[reportAssignmentType]
+            user: GetUserByShortUuidResponseDto = await sdk.users.get_user_by_short_uuid(short_uuid)
 
-            if not isUserInSquad(user):
+            if not is_user_in_squad(user):
                 return None
-       
+
         return sub
 
     except NotFoundError:
         return None
 
 
-async def getSubscriptionSettings():
-    _ensure_enabled()
+@ensure_enabled
+async def get_subscription_settings() -> SubscriptionSettingsResponseDto:
     sdk = _get_sdk()
-
-    sub: SubscriptionSettingsResponseDto = await sdk.subscriptions_settings.get_settings()  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
-
-    return sub
+    return await sdk.subscriptions_settings.get_settings()

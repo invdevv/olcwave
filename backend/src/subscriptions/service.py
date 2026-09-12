@@ -210,8 +210,8 @@ class Subscriptions:
 
     @staticmethod
     async def _validate_rw_user(short_uuid: str) -> Any | None:
-        from rw.sdk import isUserValid
-        rw_user = await isUserValid(short_uuid)
+        from rw.sdk import get_subscription_info
+        rw_user = await get_subscription_info(short_uuid)
         if rw_user:
             return rw_user
         return None
