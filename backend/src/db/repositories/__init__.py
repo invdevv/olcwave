@@ -1,1 +1,1 @@
-from src.db.repositories.base import BaseCRUDRepository
+from db.repositories.base import BaseCRUDRepository

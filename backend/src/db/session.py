@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
 from sqlalchemy.ext.asyncio.session import async_sessionmaker
 from fastapi.exceptions import HTTPException
 
-from src.db.base import async_engine
+from db.base import async_engine
 
 
 class SessionManager:

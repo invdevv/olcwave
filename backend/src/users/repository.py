@@ -4,7 +4,7 @@ from sqlalchemy import insert, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from users.models import User
-from src.db.repositories import BaseCRUDRepository
+from db.repositories import BaseCRUDRepository
 
 
 class UserRepository(BaseCRUDRepository[User]):

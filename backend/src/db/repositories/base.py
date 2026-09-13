@@ -3,7 +3,7 @@ from typing import Type, TypeVar, Generic, Any, List, Protocol, Optional
 from sqlalchemy import Select, Update, Delete, Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db.session import SessionManager, get_session_manager
+from db.session import SessionManager, get_session_manager
 from core.database import Base
 
 

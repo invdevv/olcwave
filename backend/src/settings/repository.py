@@ -1,10 +1,10 @@
-from typing import Dict, Type, Optional
+from typing import Type, Optional
 
-from sqlalchemy import insert, delete, select, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from settings.models import SettingsModel
-from src.db.repositories import BaseCRUDRepository
+from db.repositories import BaseCRUDRepository
 
 
 class SettingsRepository(BaseCRUDRepository[SettingsModel]):

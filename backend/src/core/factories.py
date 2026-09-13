@@ -50,6 +50,7 @@ def get_subscription_service() -> SubscriptionsService:
     return SubscriptionsService(
         remnawave_service=get_remnawave_service(),
         users_service=get_users_service(),
+        settings_service=get_settings_service(),
     )
 
 
