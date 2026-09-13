@@ -17,11 +17,6 @@ from profiles.service import Profiles
 from settings.service import SettingsService
 from rw.service import RemnawaveService
 from users.service import UsersService
-from core.factories import (
-    get_remnawave_service,
-    get_settings_service,
-    get_users_service,
-)
 
 
 TRANSPORT_NAMES = {
@@ -225,9 +220,8 @@ class SubscriptionsService:
             ):
                 await OlcRTC.remove(name)
 
-    @staticmethod
-    async def _validate_rw_user(short_uuid: str) -> Any | None:
-        rw_user = await get_remnawave_service().get_subscription_info(short_uuid)
+    async def _validate_rw_user(self, short_uuid: str) -> Any | None:
+        rw_user = await self._remnawave_service.get_subscription_info(short_uuid)
         if rw_user:
             return rw_user
         return None
