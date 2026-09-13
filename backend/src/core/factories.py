@@ -8,6 +8,8 @@ from users.repository import UserRepository
 from users.service import UsersService
 from settings.service import SettingsService
 from settings.repository import SettingsRepository
+from routing.service import RoutingService
+from routing.repository import RoutingRepository
 from traffic import TrafficManager
 from rw_sync import SyncManager
 
@@ -60,3 +62,8 @@ def get_traffic_manager() -> TrafficManager:
         user_service=get_users_service(),
         settings_service=get_settings_service(),
     )
+
+
+@lru_cache
+def get_routing_service() -> RoutingService:
+    return RoutingService(RoutingRepository())

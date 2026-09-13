@@ -2,19 +2,20 @@ import asyncio
 import json
 
 from aiodocker import DockerError
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 
-from core.database import async_session_factory
-from routing.db import RoutingDB
+from routing.repository import RoutingRepository
 from xraycore.sdk import XrayCore
 from xraycore.geodata.geodat_pb2 import GeoSiteList, GeoIPList
 
 
-class Routing:
-    @staticmethod
-    async def validate_routing_geotags(routing: str):
+class RoutingService:
+    def __init__(self, repo: RoutingRepository) -> None:
+        self._repo = repo
+
+    async def validate_routing_geotags(self, routing: str):
         try:
-            geotags = await Routing.get_geotags()
+            geotags = await self.get_geotags()
         except Exception:
             raise HTTPException(
                 status_code=400,
@@ -147,55 +148,45 @@ class Routing:
             indent=2,
         )
 
-    @staticmethod
-    async def create(routing: str):
-        await Routing.validate_routing_geotags(routing)
+    async def create(self, routing: str):
+        await self.validate_routing_geotags(routing)
 
-        xray_json = Routing.routing_to_xray_json(routing)
-
-        async with async_session_factory() as db:
-            await RoutingDB.create(
-                db,
-                xray_json,
-            )
+        xray_json = self.routing_to_xray_json(routing)
+        await self._repo.add_routing(xray_json)
 
         await XrayCore.run(xray_json)
 
         asyncio.create_task(
-            Routing.restart_all("host.docker.internal:10808")
+            self.restart_all("host.docker.internal:10808")
         )
 
         return xray_json
 
-    @staticmethod
-    async def get():
-        async with async_session_factory() as db:
-            return await RoutingDB.get(db)
-
-    @staticmethod
-    async def update(routing: str):
-        await Routing.validate_routing_geotags(routing)
-
-        xray_json = Routing.routing_to_xray_json(routing)
-
-        async with async_session_factory() as db:
-            await RoutingDB.update(
-                db,
-                xray_json,
+    async def get(self) -> str:
+        routing = await self._repo.get_routing()
+        if not routing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Routing not found",
             )
+        return routing.get("xray_json", "")
+
+    async def update(self, routing: str) -> str:
+        await self.validate_routing_geotags(routing)
+
+        xray_json = self.routing_to_xray_json(routing)
+        await self._repo.update_routing(xray_json)
 
         await XrayCore.run(xray_json)
 
         asyncio.create_task(
-            Routing.restart_all("host.docker.internal:10808")
+            self.restart_all("host.docker.internal:10808")
         )
 
         return xray_json
 
-    @staticmethod
-    async def delete():
-        async with async_session_factory() as db:
-            await RoutingDB.delete(db)
+    async def delete(self) -> None:
+        await self._repo.delete_routing()
 
         try:
             await XrayCore.stop()
@@ -203,7 +194,7 @@ class Routing:
             pass
 
         asyncio.create_task(
-            Routing.restart_all()
+            self.restart_all()
         )
 
     @staticmethod
@@ -243,7 +234,7 @@ class Routing:
             async with sem:
                 await Containers.restart(
                     container.name,
-                    upstream_proxy_addr = upstream_proxy_addr
+                    upstream_proxy_addr=upstream_proxy_addr
                 )
 
         containers = await Containers.all()

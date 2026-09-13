@@ -11,7 +11,7 @@ from aiodocker import DockerError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from routing.service import Routing
+from routing.service import RoutingService
 from settings.service import SettingsService
 from settings.router import router as settings_router
 from auth.router import router as auth_router
@@ -27,6 +27,7 @@ from core.factories import (
     get_sync_manager,
     get_settings_service,
     get_traffic_manager,
+    get_routing_service,
 )
 from core.database import create_tables
 from traffic import TrafficManager
@@ -36,16 +37,17 @@ from docker_client import docker_client
 @asynccontextmanager
 async def lifespan(
     app: FastAPI,
-    sync_manager: SyncManager = get_sync_manager(),
+    routing_service: RoutingService = get_routing_service(),
     settings_service: SettingsService = get_settings_service(),
     traffic_manager: TrafficManager = get_traffic_manager(),
+    sync_manager: SyncManager = get_sync_manager(),
 ):
     await create_tables()
     docker = docker_client.client
     await settings_service.load()
 
     try:
-        routing = await Routing.get()
+        routing = await routing_service.get()
     except HTTPException:
         routing = False
     if routing:
