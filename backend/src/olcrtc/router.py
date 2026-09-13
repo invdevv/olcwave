@@ -9,7 +9,8 @@ from olcrtc.schemas import (
     ContainerStatsSchema,
 )
 from olcrtc.service import Containers
-from users.service import Users
+from core.factories import get_users_service
+from users.service import UsersService
 
 
 router = APIRouter(prefix="/containers", tags=["containers"])
@@ -21,12 +22,16 @@ async def get_all(_admin: dict = Depends(get_current_admin)) -> list[ContainerSc
 
 
 @router.post("/run")
-async def run(name: str, _admin: dict = Depends(get_current_admin)):
+async def run(
+    name: str,
+    _admin: dict = Depends(get_current_admin),
+    users_service: UsersService = Depends(get_users_service)
+):
     # Block starting a container when its owner has exceeded their traffic limit.
     parts = name.split("-", 2)
     if len(parts) == 3 and parts[0] == "olcwave":
         try:
-            traffic = await Users.get_traffic(parts[2])
+            traffic = await users_service.get_traffic(parts[2])
         except Exception:
             traffic = None
         if traffic and traffic.exceeded:

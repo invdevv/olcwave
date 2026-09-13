@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn
-from aiodocker import DockerError
+from aiodocker import DockerError, Docker
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,18 +20,29 @@ from subscriptions.router import router as subscriptions_router
 from olcrtc.router import router as containers_router
 from routing.router import router as routing_router
 from xraycore.sdk import XrayCore
+from rw_sync import SyncManager
 from core.config import settings
+from core.factories import (
+    get_sync_manager,
+    get_settings_service,
+    get_traffic_manager,
+)
 from core.database import create_tables
 from traffic import TrafficManager
-from rw_sync import SyncManager
 from docker_client import docker_client
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(
+    app: FastAPI,
+    docker: Docker = docker_client.client,
+    sync_manager: SyncManager = get_sync_manager(),
+    settings_service: SettingsService = get_settings_service(),
+    traffic_manager: TrafficManager = get_traffic_manager(),
+):
     await create_tables()
     docker = docker_client.client
-    await SettingsService.load()
+    await settings_service.load()
 
     try:
         routing = await Routing.get()
@@ -41,9 +52,9 @@ async def lifespan(app: FastAPI):
         await XrayCore.run(routing)
 
     if settings.RW_ENABLED:
-        SyncManager.start()
+        sync_manager.start()
 
-    traffic_task = asyncio.create_task(TrafficManager.run())
+    traffic_task = asyncio.create_task(traffic_manager.run())
 
     yield
 
@@ -54,7 +65,7 @@ async def lifespan(app: FastAPI):
         pass
 
     if settings.RW_ENABLED:
-        await SyncManager.stop()
+        await sync_manager.stop()
 
     try:
         await XrayCore.stop()
@@ -63,8 +74,12 @@ async def lifespan(app: FastAPI):
     await docker.close()
 
 
-app = FastAPI(lifespan=lifespan, openapi_url="", docs_url="",
-              redoc_url="")  # pyright: ignore[reportArgumentType]
+app = FastAPI(
+    lifespan=lifespan,
+    openapi_url="",
+    docs_url="",
+    redoc_url=""
+)
 
 app.add_middleware(
     CORSMiddleware,

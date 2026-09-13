@@ -14,8 +14,14 @@ from olcrtc.sdk import OlcRTC
 from profiles.roomGenerator import RoomChecker, RoomGenerator
 from profiles.service import Containers
 from profiles.service import Profiles
-from users.service import Users
-from core.factories import get_remnawave_service
+from settings.service import SettingsService
+from rw.service import RemnawaveService
+from users.service import UsersService
+from core.factories import (
+    get_remnawave_service,
+    get_settings_service,
+    get_users_service,
+)
 
 
 TRANSPORT_NAMES = {
@@ -60,7 +66,17 @@ def bytes_to_notation(num: float):
     return f"{int(num)}{notations[ptr]}"
 
 
-class Subscriptions:
+class SubscriptionsService:
+    def __init__(
+        self,
+        remnawave_service: RemnawaveService,
+        users_service: UsersService,
+        settings_service: SettingsService,
+    ) -> None:
+        self._remnawave_service = remnawave_service
+        self._users_service = users_service
+        self._settings_service = settings_service
+
     @staticmethod
     def remove_last_emoji(s: str) -> tuple[str, str]:
         matches = list(emoji.emoji_list(s))
@@ -134,7 +150,7 @@ class Subscriptions:
     def config_to_uri(config: str, name: str) -> str:
         cfg = yaml.safe_load(config)
 
-        options = Subscriptions.build_transport_options(cfg)
+        options = SubscriptionsService.build_transport_options(cfg)
 
         return (
             f"olcrtc://{cfg['auth']['provider']}?"
@@ -160,8 +176,8 @@ class Subscriptions:
 
         return servers
 
-    @staticmethod
     def prepare_sub_text(
+        self,
         uris: list[str],
         name: str,
         used: int = 0,
@@ -170,7 +186,7 @@ class Subscriptions:
         txt = (
             f"#name: {name}\n"
             f"#update: 2147483647\n"
-            f"#refresh: {SettingsService.get().sub_update_interval}\n"
+            f"#refresh: {self._settings_service.get().sub_update_interval}\n"
         )
         if limit == 0:
             txt += f"#used: {bytes_to_notation(used)}\n"
@@ -185,7 +201,7 @@ class Subscriptions:
         for uri in uris:
             name = uri[uri.find("$") + 1:]
 
-            name, icon = Subscriptions.remove_last_emoji(name)
+            name, icon = SubscriptionsService.remove_last_emoji(name)
 
             txt += (
                 f"{uri}\n"
@@ -216,12 +232,15 @@ class Subscriptions:
             return rw_user
         return None
 
-    @staticmethod
-    async def _ensure_local_user_from_rw(short_uuid: str, rw_user: Any):
+    async def _ensure_local_user_from_rw(
+        self,
+        short_uuid: str,
+        rw_user: Any
+    ) -> None:
         try:
-            await Users.get(short_uuid)
+            await self._users_service.get(short_uuid)
         except Exception:
-            await Users.add(
+            await self._users_service.add(
                 UserSchema(
                     short_uuid=short_uuid,
                     name=rw_user.user.username,
@@ -229,8 +248,7 @@ class Subscriptions:
                 )
             )
 
-    @staticmethod
-    def traffic_limit_response(traffic: TrafficInfoSchema):
+    def traffic_limit_response(self, traffic: TrafficInfoSchema):
         traffic_uri = (
             "olcrtc://wbstream?"
             "datachannel@0#"
@@ -239,9 +257,9 @@ class Subscriptions:
         )
 
         return Response(
-            content=Subscriptions.prepare_sub_text(
+            content=self.prepare_sub_text(
                 [traffic_uri],
-                SettingsService.get().sub_name,
+                self._settings_service.get().sub_name,
                 traffic.used,
                 traffic.limit,
             ),
@@ -252,7 +270,7 @@ class Subscriptions:
     @staticmethod
     async def ensure_profiles_running(short_uuid: str):
 
-        running_tags = await Subscriptions.get_launched_tags(
+        running_tags = await SubscriptionsService.get_launched_tags(
             short_uuid
         )
 
@@ -311,7 +329,7 @@ class Subscriptions:
         missing = profiles.keys() - configs.keys()
 
         async def start_profile(tag):
-            config = await Subscriptions.profile_to_config(
+            config = await SubscriptionsService.profile_to_config(
                 profiles[tag].profile
             )
 
@@ -329,33 +347,32 @@ class Subscriptions:
 
         return configs, profiles
 
-    @staticmethod
-    async def get(short_uuid: str):
+    async def get(self, short_uuid: str):
         if settings.RW_ENABLED:
-            rw_user = await Subscriptions._validate_rw_user(short_uuid)
+            rw_user = await self._validate_rw_user(short_uuid)
             if rw_user is None:
-                await Subscriptions._cleanup_user_containers(short_uuid)
+                await self._cleanup_user_containers(short_uuid)
                 return Response(status_code=404)
 
-            await Subscriptions._ensure_local_user_from_rw(short_uuid, rw_user)
+            await self._ensure_local_user_from_rw(short_uuid, rw_user)
         else:
             try:
-                await Users.get(short_uuid)
+                await self._users_service.get(short_uuid)
             except Exception:
                 return Response(status_code=404)
 
-        traffic = await Users.get_traffic(short_uuid)
+        traffic = await self._users_service.get_traffic(short_uuid)
         if traffic.exceeded:
-            return Subscriptions.traffic_limit_response(
+            return self.traffic_limit_response(
                 traffic
             )
 
-        configs, profiles = await Subscriptions.ensure_profiles_running(
+        configs, profiles = await self.ensure_profiles_running(
             short_uuid
         )
 
         uris = [
-            Subscriptions.config_to_uri(
+            self.config_to_uri(
                 configs[tag],
                 profiles[tag].name,
             )
@@ -363,9 +380,9 @@ class Subscriptions:
         ]
 
         return Response(
-            content=Subscriptions.prepare_sub_text(
+            content=self.prepare_sub_text(
                 uris,
-                SettingsService.get().sub_name,
+                self._settings_service.get().sub_name,
                 traffic.used,
                 traffic.limit,
             ),

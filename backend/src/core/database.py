@@ -12,7 +12,7 @@ from core.config import settings
 
 
 async_engine: AsyncEngine = create_async_engine(
-    settings.DB_URL,
+    settings.DB_DSN,
     echo=False,
 )
 

@@ -3,13 +3,21 @@ import asyncio
 from settings.service import SettingsService
 from olcrtc.sdk import OlcRTC
 from olcrtc.service import Containers
-from users.service import Users
+from users.service import UsersService
 
 
 class TrafficManager:
     """Background traffic accounting and limit enforcement."""
 
     _last_totals: dict[str, int] = {}
+
+    def __init__(
+        self,
+        user_service: UsersService,
+        settings_service: SettingsService,
+    ) -> None:
+        self._user_service = user_service
+        self._settings_service = settings_service
 
     @staticmethod
     def _owner_of(name: str) -> str | None:
@@ -89,14 +97,13 @@ class TrafficManager:
             except Exception:
                 pass
 
-    @staticmethod
-    async def _tick():
+    async def _tick(self):
         deltas = await TrafficManager._collect_deltas()
         for short_uuid, delta in deltas.items():
             try:
-                await Users.add_traffic_used(short_uuid, delta)
+                await self._user_service.add_traffic_used(short_uuid, delta)
 
-                info = await Users.get_traffic(short_uuid)
+                info = await self._user_service.get_traffic(short_uuid)
 
                 if info.exceeded:
                     await TrafficManager._stop_user_containers(short_uuid)
@@ -105,11 +112,10 @@ class TrafficManager:
                 # one broken user should not kill loop
                 continue
 
-    @staticmethod
-    async def run():
+    async def run(self):
         while True:
             try:
-                await TrafficManager._tick()
+                await self._tick()
 
             except asyncio.CancelledError:
                 raise
@@ -118,5 +124,5 @@ class TrafficManager:
                 pass
 
             await asyncio.sleep(
-                SettingsService.get().traffic_collect_interval
+                self._settings_service.get().traffic_collect_interval
             )
