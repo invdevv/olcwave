@@ -4,9 +4,10 @@
 
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Literal
 
 import uvicorn
-from aiodocker import DockerError, Docker
+from aiodocker import DockerError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,7 +36,6 @@ from docker_client import docker_client
 @asynccontextmanager
 async def lifespan(
     app: FastAPI,
-    docker: Docker = docker_client.client,
     sync_manager: SyncManager = get_sync_manager(),
     settings_service: SettingsService = get_settings_service(),
     traffic_manager: TrafficManager = get_traffic_manager(),
@@ -99,7 +99,7 @@ app.include_router(routing_router)
 
 
 @app.get("/health")
-async def healthcheck():
+async def healthcheck() -> Literal['ok']:
     return "ok"
 
 
