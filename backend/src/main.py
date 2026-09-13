@@ -20,8 +20,8 @@ from subscriptions.router import router as subscriptions_router
 from olcrtc.router import router as containers_router
 from routing.router import router as routing_router
 from xraycore.sdk import XrayCore
-from config import settings
-from database import create_tables
+from core.config import settings
+from core.database import create_tables
 from traffic import TrafficManager
 from rw_sync import SyncManager
 from docker_client import init_docker, close_docker

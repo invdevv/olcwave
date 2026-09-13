@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from auth.dependencies import get_current_admin
-from config import settings
+from core.config import settings
 from settings.schemas import RuntimeSettings
 from settings.service import SettingsService
 

@@ -4,7 +4,7 @@ import json
 from aiodocker import DockerError
 from fastapi import HTTPException
 
-from database import async_session_factory
+from core.database import async_session_factory
 from routing.db import RoutingDB
 from xraycore.sdk import XrayCore
 from xraycore.geodata.geodat_pb2 import GeoSiteList, GeoIPList

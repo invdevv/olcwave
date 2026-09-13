@@ -7,7 +7,7 @@ import yaml
 
 from fastapi import Response
 
-from config import settings
+from core.config import settings
 from settings.service import SettingsService
 from users.schemas import TrafficInfoSchema, UserSchema
 from olcrtc.sdk import OlcRTC
@@ -15,6 +15,7 @@ from profiles.roomGenerator import RoomChecker, RoomGenerator
 from profiles.service import Containers
 from profiles.service import Profiles
 from users.service import Users
+from core.factories import get_remnawave_service
 
 
 TRANSPORT_NAMES = {
@@ -210,8 +211,7 @@ class Subscriptions:
 
     @staticmethod
     async def _validate_rw_user(short_uuid: str) -> Any | None:
-        from rw.sdk import get_subscription_info
-        rw_user = await get_subscription_info(short_uuid)
+        rw_user = await get_remnawave_service().get_subscription_info(short_uuid)
         if rw_user:
             return rw_user
         return None

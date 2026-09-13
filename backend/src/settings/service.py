@@ -2,7 +2,7 @@ from datetime import datetime
 
 from settings.models import SettingsModel
 from settings.schemas import RuntimeSettings
-from database import async_session_factory
+from core.database import async_session_factory
 
 
 class SettingsService:

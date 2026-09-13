@@ -4,7 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from typing import Annotated
 
-from database import Base
+from core.database import Base
 
 UTC_NOW = Annotated[datetime, mapped_column(DateTime(timezone=True), server_default=text("now()"))]
 

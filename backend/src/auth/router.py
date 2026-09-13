@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 import jwt
 import secrets
 
-from config import settings
+from core.config import settings
 from auth.schemas import LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])

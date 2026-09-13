@@ -3,7 +3,7 @@ import yaml
 from fastapi import HTTPException
 
 from olcrtc.service import Containers
-from database import async_session_factory
+from core.database import async_session_factory
 from profiles.db import ProfilesDB
 from profiles.schemas import ProfileSchema
 

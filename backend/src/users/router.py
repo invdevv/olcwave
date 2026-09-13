@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import get_current_admin
-from config import settings
+from core.config import settings
 from users.service import Users
 from users.schemas import UserSchema, TrafficInfoSchema, TrafficLimitUpdate
 

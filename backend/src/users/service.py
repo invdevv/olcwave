@@ -1,9 +1,9 @@
-import asyncio
 from datetime import datetime, timezone
 
-from config import settings
+from core.config import settings
+from core.factories import get_remnawave_service
 from settings.service import SettingsService
-from database import async_session_factory
+from core.database import async_session_factory
 from users.db import UserDB
 from users.schemas import UserSchema, TrafficInfoSchema
 
@@ -79,16 +79,15 @@ class Users:
     async def sync_with_remnawave():
         if not settings.RW_ENABLED:
             raise RuntimeError("Remnawave is not enabled")
-
-        from rw.sdk import get_all_users, is_user_in_squad
-
-        rw_users = await get_all_users()
+        
+        remnawave = get_remnawave_service()
+        rw_users = await remnawave.get_all_users()
         db_users = await Users.get_all()
 
         rw_map = {
             u.short_uuid: u
             for u in rw_users.users
-            if is_user_in_squad(u)
+            if remnawave.is_user_in_squad(u)
         }
 
         db_map = {u.short_uuid: u for u in db_users}
