@@ -3,12 +3,12 @@
 # OLCWave is free software licensed under AGPL-3.0.
 
 import asyncio
+from contextlib import asynccontextmanager
 
+import uvicorn
 from aiodocker import DockerError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
-import uvicorn
 
 from routing.service import Routing
 from settings.service import SettingsService
@@ -24,12 +24,13 @@ from core.config import settings
 from core.database import create_tables
 from traffic import TrafficManager
 from rw_sync import SyncManager
-from docker_client import init_docker, close_docker
+from docker_client import docker_client
 
 
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_tables()
-    await init_docker()
+    docker = docker_client.client
     await SettingsService.load()
 
     try:
@@ -59,10 +60,11 @@ async def lifespan(app: FastAPI):
         await XrayCore.stop()
     except DockerError:
         pass
-    await close_docker()
+    await docker.close()
 
 
-app = FastAPI(lifespan=lifespan, openapi_url="", docs_url="", redoc_url="")  # pyright: ignore[reportArgumentType]
+app = FastAPI(lifespan=lifespan, openapi_url="", docs_url="",
+              redoc_url="")  # pyright: ignore[reportArgumentType]
 
 app.add_middleware(
     CORSMiddleware,

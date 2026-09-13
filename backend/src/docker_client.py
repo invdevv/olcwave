@@ -1,16 +1,23 @@
-import aiodocker
+from functools import lru_cache
 
-docker: aiodocker.Docker | None = None
-
-
-async def init_docker():
-    global docker
-    docker = aiodocker.Docker()
+from aiodocker import Docker
 
 
-async def close_docker():
-    global docker
+class DockerClient:
+    def __init__(self, docker: Docker) -> None:
+        self._docker = docker
 
-    if docker:
-        await docker.close()
-        docker = None
+    @property
+    def client(self) -> Docker:
+        return self._docker
+
+    async def close(self) -> None:
+        await self._docker.close()
+
+
+@lru_cache
+def get_docker_client() -> DockerClient:
+    return DockerClient(Docker())
+
+
+docker_client = get_docker_client()
