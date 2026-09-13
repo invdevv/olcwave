@@ -40,6 +40,6 @@ class SettingsRepository(BaseCRUDRepository[SettingsModel]):
         stmt = (
             update(SettingsModel)
             .where(SettingsModel.id == 1)
-            .values(**settings)
+            .values(data=settings)
         )
         return await self.update_one(stmt, session)
