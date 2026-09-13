@@ -2,7 +2,7 @@ import asyncio
 
 from settings.service import SettingsService
 from olcrtc.sdk import OlcRTC
-from olcrtc.service import Containers
+from olcrtc.service import ContainersService
 from users.service import UsersService
 
 
@@ -39,7 +39,7 @@ class TrafficManager:
 
             name = info["Name"].lstrip("/")
 
-            if not await Containers.is_panel_container(cont):
+            if not await ContainersService.is_panel_container(cont):
                 continue
 
             owner = TrafficManager._owner_of(name)
@@ -49,7 +49,7 @@ class TrafficManager:
 
             seen.add(name)
 
-            stats = await Containers.get_stats(name)
+            stats = await ContainersService.get_stats(name)
 
             total = stats.total_bytes
 
@@ -85,7 +85,7 @@ class TrafficManager:
 
             name = info["Name"].lstrip("/")
 
-            if not await Containers.is_panel_container(cont):
+            if not await ContainersService.is_panel_container(cont):
                 continue
 
             if TrafficManager._owner_of(name) != short_uuid:

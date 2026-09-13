@@ -4,7 +4,7 @@ from sqlalchemy import Select, Update, Delete, Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import SessionManager, get_session_manager
-from core.database import Base
+from db.base import Base
 
 
 T = TypeVar("T", bound=Base)

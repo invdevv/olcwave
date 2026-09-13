@@ -20,7 +20,6 @@ from users.router import router as users_router
 from subscriptions.router import router as subscriptions_router
 from olcrtc.router import router as containers_router
 from routing.router import router as routing_router
-from xraycore.sdk import XrayCore
 from rw_sync import SyncManager
 from core.config import settings
 from core.factories import (
@@ -28,8 +27,9 @@ from core.factories import (
     get_settings_service,
     get_traffic_manager,
     get_routing_service,
+    get_xray_core_client,
 )
-from core.database import create_tables
+from db.base import create_tables
 from traffic import TrafficManager
 from docker_client import docker_client
 
@@ -44,14 +44,16 @@ async def lifespan(
 ):
     await create_tables()
     docker = docker_client.client
+    xraycore = get_xray_core_client()
     await settings_service.load()
 
     try:
         routing = await routing_service.get()
     except HTTPException:
         routing = False
+
     if routing:
-        await XrayCore.run(routing)
+        await xraycore.run(routing)
 
     if settings.RW_ENABLED:
         sync_manager.start()
@@ -70,7 +72,7 @@ async def lifespan(
         await sync_manager.stop()
 
     try:
-        await XrayCore.stop()
+        await xraycore.stop()
     except DockerError:
         pass
     await docker.close()

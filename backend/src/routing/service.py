@@ -5,13 +5,18 @@ from aiodocker import DockerError
 from fastapi import HTTPException, status
 
 from routing.repository import RoutingRepository
-from xraycore.sdk import XrayCore
+from xraycore.sdk import XrayCoreClient
 from xraycore.geodata.geodat_pb2 import GeoSiteList, GeoIPList
 
 
 class RoutingService:
-    def __init__(self, repo: RoutingRepository) -> None:
+    def __init__(
+        self,
+        repo: RoutingRepository,
+        xray_core: XrayCoreClient
+    ) -> None:
         self._repo = repo
+        self._xray_core = xray_core
 
     async def validate_routing_geotags(self, routing: str):
         try:
@@ -154,7 +159,7 @@ class RoutingService:
         xray_json = self.routing_to_xray_json(routing)
         await self._repo.add_routing(xray_json)
 
-        await XrayCore.run(xray_json)
+        await self._xray_core.run(xray_json)
 
         asyncio.create_task(
             self.restart_all("host.docker.internal:10808")
@@ -177,7 +182,7 @@ class RoutingService:
         xray_json = self.routing_to_xray_json(routing)
         await self._repo.update_routing(xray_json)
 
-        await XrayCore.run(xray_json)
+        await self._xray_core.run(xray_json)
 
         asyncio.create_task(
             self.restart_all("host.docker.internal:10808")
@@ -189,7 +194,7 @@ class RoutingService:
         await self._repo.delete_routing()
 
         try:
-            await XrayCore.stop()
+            await self._xray_core.stop()
         except DockerError:
             pass
 
@@ -197,10 +202,9 @@ class RoutingService:
             self.restart_all()
         )
 
-    @staticmethod
-    async def get_geotags():
-        geoip_data = await XrayCore.get_geoip()
-        geosite_data = await XrayCore.get_geosite()
+    async def get_geotags(self):
+        geoip_data = await self._xray_core.get_geoip()
+        geosite_data = await self._xray_core.get_geosite()
 
         geoip = GeoIPList()
         geosite = GeoSiteList()
@@ -226,18 +230,18 @@ class RoutingService:
 
     @staticmethod
     async def restart_all(upstream_proxy_addr: str = ""):
-        from olcrtc.service import Containers
+        from olcrtc.service import ContainersService
 
         sem = asyncio.Semaphore(10)
 
         async def restart_one(container):
             async with sem:
-                await Containers.restart(
+                await ContainersService.restart(
                     container.name,
                     upstream_proxy_addr=upstream_proxy_addr
                 )
 
-        containers = await Containers.all()
+        containers = await ContainersService.all()
 
         await asyncio.gather(
             *(restart_one(c) for c in containers)

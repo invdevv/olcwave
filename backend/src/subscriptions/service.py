@@ -12,10 +12,10 @@ from settings.service import SettingsService
 from users.schemas import TrafficInfoSchema, UserSchema
 from olcrtc.sdk import OlcRTC
 from profiles.roomGenerator import RoomChecker, RoomGenerator
-from profiles.service import Containers
-from profiles.service import Profiles
+from profiles.service import ContainersService
+from profiles.service import ProfilesService
 from settings.service import SettingsService
-from rw.service import RemnawaveService
+from remnawave.service import RemnawaveService
 from users.service import UsersService
 
 
@@ -67,10 +67,14 @@ class SubscriptionsService:
         remnawave_service: RemnawaveService,
         users_service: UsersService,
         settings_service: SettingsService,
+        profiles_service: ProfilesService,
+        containers_service: ContainersService
     ) -> None:
         self._remnawave_service = remnawave_service
         self._users_service = users_service
         self._settings_service = settings_service
+        self._profiles_service = profiles_service
+        self._containers_service = containers_service
 
     @staticmethod
     def remove_last_emoji(s: str) -> tuple[str, str]:
@@ -160,7 +164,7 @@ class SubscriptionsService:
         servers = []
 
         for srv in await OlcRTC.all():
-            if await Containers.is_panel_container(srv):
+            if await ContainersService.is_panel_container(srv):
                 info = await srv.show()
                 name = info["Name"].lstrip("/")
 
@@ -261,8 +265,7 @@ class SubscriptionsService:
             media_type="text/plain",
         )
 
-    @staticmethod
-    async def ensure_profiles_running(short_uuid: str):
+    async def ensure_profiles_running(self, short_uuid: str):
 
         running_tags = await SubscriptionsService.get_launched_tags(
             short_uuid
@@ -313,7 +316,7 @@ class SubscriptionsService:
               for tag, cfg in configs.items())
         )
 
-        profiles_list = await Profiles.get_all()
+        profiles_list = await self._profiles_service.get_all()
 
         profiles = {
             profile.tag: profile
@@ -329,7 +332,7 @@ class SubscriptionsService:
 
             configs[tag] = config
 
-            await Containers.run(
+            await self._containers_service.run(
                 config,
                 tag,
                 short_uuid,

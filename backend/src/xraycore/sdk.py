@@ -107,11 +107,3 @@ class XrayCoreClient:
 
     async def get_geosite(self) -> bytes:
         return await self._get_archive("/app/geosite.dat")
-
-
-@lru_cache
-def get_xraycore_client() -> XrayCoreClient:
-    return XrayCoreClient(docker_client)
-
-
-XrayCore = get_xraycore_client()

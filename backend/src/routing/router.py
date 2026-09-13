@@ -3,9 +3,9 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Body, HTTPException
 
 from auth.dependencies import get_current_admin
-from xraycore.sdk import XrayCore
+from xraycore.sdk import XrayCoreClient
 from routing.service import RoutingService
-from core.factories import get_routing_service
+from core.factories import get_routing_service, get_xray_core_client
 
 router = APIRouter(prefix="/routing", tags=["routing"])
 
@@ -60,8 +60,11 @@ async def delete(
 
 
 @router.get("/logs")
-async def logs(_admin: dict = Depends(get_current_admin)) -> str:
-    return await XrayCore.logs()
+async def logs(
+    _admin: dict = Depends(get_current_admin),
+    xray_core_client: XrayCoreClient = Depends(get_xray_core_client),
+) -> str:
+    return await xray_core_client.logs()
 
 
 @router.get("/geotags")

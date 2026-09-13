@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 
 from core.config import settings
 from settings.service import SettingsService
-from rw.service import RemnawaveService
+from remnawave.service import RemnawaveService
 from users.repository import UserRepository
 from users.schemas import UserSchema, TrafficInfoSchema
 

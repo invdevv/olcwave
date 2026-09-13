@@ -1,8 +1,8 @@
 from functools import lru_cache
 
 from core.config import settings
-from rw.client import RemnawaveClient
-from rw.service import RemnawaveService
+from remnawave.client import RemnawaveClient
+from remnawave.service import RemnawaveService
 from subscriptions.service import SubscriptionsService
 from users.repository import UserRepository
 from users.service import UsersService
@@ -10,13 +10,33 @@ from settings.service import SettingsService
 from settings.repository import SettingsRepository
 from routing.service import RoutingService
 from routing.repository import RoutingRepository
+from profiles.service import ProfilesService
+from profiles.repository import ProfileRepository
+from olcrtc.service import ContainersService
 from traffic import TrafficManager
 from rw_sync import SyncManager
+from docker_client import docker_client
+from xraycore.sdk import XrayCoreClient
+
+
+@lru_cache
+def get_xray_core_client() -> XrayCoreClient:
+    return XrayCoreClient(docker_client)
+
+
+@lru_cache
+def get_containers_service() -> ContainersService:
+    return ContainersService(get_xray_core_client())
 
 
 @lru_cache
 def get_settings_service() -> SettingsService:
     return SettingsService(SettingsRepository())
+
+
+@lru_cache
+def get_profiles_service() -> ProfilesService:
+    return ProfilesService(ProfileRepository())
 
 
 @lru_cache
@@ -53,6 +73,8 @@ def get_subscription_service() -> SubscriptionsService:
         remnawave_service=get_remnawave_service(),
         users_service=get_users_service(),
         settings_service=get_settings_service(),
+        profiles_service=get_profiles_service(),
+        containers_service=get_containers_service(),
     )
 
 
@@ -66,4 +88,7 @@ def get_traffic_manager() -> TrafficManager:
 
 @lru_cache
 def get_routing_service() -> RoutingService:
-    return RoutingService(RoutingRepository())
+    return RoutingService(
+        repo=RoutingRepository(),
+        xray_core=get_xray_core_client(),
+    )

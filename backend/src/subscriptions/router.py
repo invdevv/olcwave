@@ -8,7 +8,7 @@ from core.factories import (
     get_settings_service,
 )
 from users.service import UsersService
-from rw.service import RemnawaveService
+from remnawave.service import RemnawaveService
 from settings.service import SettingsService
 from subscriptions.service import SubscriptionsService
 
