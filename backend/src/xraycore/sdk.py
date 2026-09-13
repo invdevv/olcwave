@@ -2,7 +2,7 @@ import io
 import tarfile
 from functools import lru_cache
 
-from aiodocker import DockerError
+from aiodocker import Docker, DockerError
 from aiodocker.containers import DockerContainer
 from docker_client import docker_client, DockerClient
 
@@ -11,7 +11,11 @@ class XrayCoreClient:
     CONTAINER_NAME = "olcwave-xraycore"
 
     def __init__(self, docker_client: DockerClient) -> None:
-        self._docker = docker_client.client
+        self._docker_client = docker_client
+
+    @property
+    def _docker(self) -> Docker:
+        return self._docker_client.client
 
     async def run(self, xray_json: str) -> DockerContainer:
         try:

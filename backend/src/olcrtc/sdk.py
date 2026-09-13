@@ -2,7 +2,7 @@ import json
 from functools import lru_cache
 
 import yaml
-from aiodocker import DockerError
+from aiodocker import Docker, DockerError
 from aiodocker.containers import DockerContainer
 
 from docker_client import docker_client, DockerClient
@@ -10,7 +10,11 @@ from docker_client import docker_client, DockerClient
 
 class OlcRTCClient:
     def __init__(self, docker_client: DockerClient) -> None:
-        self._docker = docker_client.client
+        self._docker_client = docker_client
+
+    @property
+    def _docker(self) -> Docker:
+        return self._docker_client.client
 
     async def build(self, rebuild: bool = False) -> None:
         if not rebuild:
