@@ -33,8 +33,9 @@ class SessionManager:
         except HTTPException as error:
             await session.rollback()
             raise error
-        except SQLAlchemyError:
+        except SQLAlchemyError as error:
             await session.rollback()
+            raise error
         finally:
             await session.close()
 

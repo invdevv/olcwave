@@ -29,7 +29,7 @@ class SettingsService:
     async def set(self, settings: RuntimeSettings) -> RuntimeSettings:
         self._settings = settings
         old_settings = await self._repo.get_settings()
-        data = settings.model_dump()
+        data = settings.model_dump(mode="json")
         if not old_settings:
             await self._repo.add_settings(data)
         else:
@@ -42,4 +42,4 @@ class SettingsService:
         self._settings.last_sync_at = dt
         settings = await self._repo.get_settings()
         if settings:
-            await self._repo.update_settings(self._settings.model_dump())
+            await self._repo.update_settings(self._settings.model_dump(mode="json"))
