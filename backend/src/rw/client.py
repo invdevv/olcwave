@@ -67,6 +67,10 @@ class RemnawaveClient:
             raise RemnaWaveNotFoundError(response.text)
 
         response.raise_for_status()
+        payload = response.json()
+
+        if isinstance(payload, dict) and "response" in payload:
+            return payload["response"]
         return response.json()
 
     async def get_all_users(
