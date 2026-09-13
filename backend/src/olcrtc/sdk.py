@@ -5,11 +5,14 @@ import yaml
 from aiodocker import Docker, DockerError
 from aiodocker.containers import DockerContainer
 
-from docker_client import docker_client, DockerClient
+from utils.docker_client import docker_client, DockerClient
 
 
 class OlcRTCClient:
-    def __init__(self, docker_client: DockerClient) -> None:
+    def __init__(
+        self,
+        docker_client: DockerClient,
+    ) -> None:
         self._docker_client = docker_client
 
     @property
@@ -177,11 +180,3 @@ class OlcRTCClient:
             return {}
 
         return data if isinstance(data, dict) else {}
-
-
-@lru_cache
-def get_olcrtc_client() -> OlcRTCClient:
-    return OlcRTCClient(docker_client)
-
-
-OlcRTC = get_olcrtc_client()

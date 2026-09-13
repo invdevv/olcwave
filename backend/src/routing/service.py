@@ -7,16 +7,19 @@ from fastapi import HTTPException, status
 from routing.repository import RoutingRepository
 from xraycore.sdk import XrayCoreClient
 from xraycore.geodata.geodat_pb2 import GeoSiteList, GeoIPList
+from olcrtc.service import ContainersService
 
 
 class RoutingService:
     def __init__(
         self,
         repo: RoutingRepository,
-        xray_core: XrayCoreClient
+        xray_core: XrayCoreClient,
+        constainers_service: ContainersService,
     ) -> None:
         self._repo = repo
         self._xray_core = xray_core
+        self._containets_service = constainers_service
 
     async def validate_routing_geotags(self, routing: str):
         try:
@@ -228,20 +231,19 @@ class RoutingService:
             ],
         }
 
-    @staticmethod
-    async def restart_all(upstream_proxy_addr: str = ""):
+    async def restart_all(self, upstream_proxy_addr: str = ""):
         from olcrtc.service import ContainersService
 
         sem = asyncio.Semaphore(10)
 
         async def restart_one(container):
             async with sem:
-                await ContainersService.restart(
+                await self._containets_service.restart(
                     container.name,
                     upstream_proxy_addr=upstream_proxy_addr
                 )
 
-        containers = await ContainersService.all()
+        containers = await self._containets_service.get_all_containers()
 
         await asyncio.gather(
             *(restart_one(c) for c in containers)

@@ -3,7 +3,7 @@ import asyncio
 from aiodocker.containers import DockerContainer
 
 from xraycore.sdk import XrayCoreClient
-from olcrtc.sdk import OlcRTC
+from olcrtc.sdk import OlcRTCClient
 from olcrtc.schemas import (
     ContainerConfigSchema,
     ContainerLogsSchema,
@@ -16,8 +16,10 @@ class ContainersService:
     def __init__(
         self,
         xray_core: XrayCoreClient,
+        olcrtc_client: OlcRTCClient,
     ) -> None:
         self._xray_core = xray_core
+        self._olcrtc_client = olcrtc_client
 
     @staticmethod
     async def is_panel_container(cont: DockerContainer) -> bool:
@@ -50,14 +52,11 @@ class ContainersService:
             image=info["Config"]["Image"],
         )
 
-    @staticmethod
-    async def all() -> list[ContainerSchema]:
-        containers = await OlcRTC.all(include_stopped=True)
-
+    async def get_all_containers(self) -> list[ContainerSchema]:
+        containers = await self._olcrtc_client.all(include_stopped=True)
         schemas = await asyncio.gather(
-            *(ContainersService.to_schema(container) for container in containers)
+            *(self.to_schema(container) for container in containers)
         )
-
         return [schema for schema in schemas if schema is not None]
 
     async def run(
@@ -71,51 +70,45 @@ class ContainersService:
         if await self._xray_core.is_running():
             routing_socks_addr = "host.docker.internal:10808"
 
-        await OlcRTC.run(
+        await self._olcrtc_client.run(
             config=config,
             config_tag=config_tag,
             user_id=short_uuid,
             upstream_proxy_addr=routing_socks_addr,
         )
 
-    @staticmethod
-    async def start(name: str) -> None:
-        await OlcRTC.start(name)
+    async def start(self, name: str) -> None:
+        await self._olcrtc_client.start(name)
 
-    @staticmethod
-    async def stop(name: str) -> None:
-        await OlcRTC.stop(name)
+    async def stop(self, name: str) -> None:
+        await self._olcrtc_client.stop(name)
 
-    @staticmethod
     async def restart(
+        self,
         name: str,
         upstream_proxy_addr: str = "",
         upstream_proxy_user: str = "",
         upstream_proxy_pass: str = "",
     ) -> None:
-        await OlcRTC.restart(
+        await self._olcrtc_client.restart(
             name=name,
             upstream_proxy_addr=upstream_proxy_addr,
             upstream_proxy_user=upstream_proxy_user,
             upstream_proxy_pass=upstream_proxy_pass,
         )
 
-    @staticmethod
-    async def remove(name: str) -> None:
-        await OlcRTC.remove(name)
+    async def remove(self, name: str) -> None:
+        await self._olcrtc_client.remove(name)
 
-    @staticmethod
-    async def logs(name: str) -> ContainerLogsSchema:
-        logs = await OlcRTC.logs(name)
-
+    async def logs(self, name: str) -> ContainerLogsSchema:
+        logs = await self._olcrtc_client.logs(name)
         return ContainerLogsSchema(
             name=name,
             logs=logs,
         )
 
-    @staticmethod
-    async def get_config(name: str) -> ContainerConfigSchema:
-        config = await OlcRTC.get_config(name)
+    async def get_config(self, name: str) -> ContainerConfigSchema:
+        config = await self._olcrtc_client.get_config(name)
 
         if isinstance(config, bytes):
             config = config.decode()
@@ -125,9 +118,8 @@ class ContainersService:
             config=config,
         )
 
-    @staticmethod
-    async def get_stats(name: str) -> ContainerStatsSchema:
-        data = await OlcRTC.get_stats(name)
+    async def get_stats(self, name: str) -> ContainerStatsSchema:
+        data = await self._olcrtc_client.get_stats(name)
 
         return ContainerStatsSchema(
             name=name,
@@ -138,49 +130,45 @@ class ContainersService:
             download_rate_bps=int(data.get("download_rate_bps", 0)),
         )
 
-    @staticmethod
-    async def stop_all_by_short_uuid(short_uuid: str) -> None:
-        containers = await ContainersService.all()
+    async def stop_all_by_short_uuid(self, short_uuid: str) -> None:
+        containers = await self.get_all_containers()
 
         await asyncio.gather(
             *(
-                ContainersService.stop(container.name)
+                self.stop(container.name)
                 for container in containers
                 if container.short_uuid == short_uuid
             )
         )
 
-    @staticmethod
-    async def stop_all_by_config_tag(config_tag: str) -> None:
-        containers = await ContainersService.all()
+    async def stop_all_by_config_tag(self, config_tag: str) -> None:
+        containers = await self.get_all_containers()
 
         await asyncio.gather(
             *(
-                ContainersService.stop(container.name)
+                self.stop(container.name)
                 for container in containers
                 if container.config_tag == config_tag
             )
         )
 
-    @staticmethod
-    async def remove_all_by_short_uuid(short_uuid: str) -> None:
-        containers = await ContainersService.all()
+    async def remove_all_by_short_uuid(self, short_uuid: str) -> None:
+        containers = await self.get_all_containers()
 
         await asyncio.gather(
             *(
-                ContainersService.remove(container.name)
+                self.remove(container.name)
                 for container in containers
                 if container.short_uuid == short_uuid
             )
         )
 
-    @staticmethod
-    async def remove_all_by_config_tag(config_tag: str) -> None:
-        containers = await ContainersService.all()
+    async def remove_all_by_config_tag(self, config_tag: str) -> None:
+        containers = await self.get_all_containers()
 
         await asyncio.gather(
             *(
-                ContainersService.remove(container.name)
+                self.remove(container.name)
                 for container in containers
                 if container.config_tag == config_tag
             )

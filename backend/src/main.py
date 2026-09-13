@@ -20,7 +20,7 @@ from users.router import router as users_router
 from subscriptions.router import router as subscriptions_router
 from olcrtc.router import router as containers_router
 from routing.router import router as routing_router
-from rw_sync import SyncManager
+from utils.rw_sync import SyncManager
 from core.config import settings
 from core.factories import (
     get_sync_manager,
@@ -30,8 +30,8 @@ from core.factories import (
     get_xray_core_client,
 )
 from db.base import create_tables
-from traffic import TrafficManager
-from docker_client import docker_client
+from utils.traffic import TrafficManager
+from utils.docker_client import docker_client
 
 
 @asynccontextmanager

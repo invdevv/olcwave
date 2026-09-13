@@ -1,10 +1,9 @@
 import io
 import tarfile
-from functools import lru_cache
 
 from aiodocker import Docker, DockerError
 from aiodocker.containers import DockerContainer
-from docker_client import docker_client, DockerClient
+from utils.docker_client import DockerClient
 
 
 class XrayCoreClient:

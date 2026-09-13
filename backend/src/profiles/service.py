@@ -8,8 +8,13 @@ from profiles.repository import ProfileRepository
 
 
 class ProfilesService:
-    def __init__(self, repo: ProfileRepository) -> None:
+    def __init__(
+        self,
+        repo: ProfileRepository,
+        containers_service: ContainersService,
+    ) -> None:
         self._repo = repo
+        self._containers_service = containers_service
 
     @staticmethod
     def validate(config: str) -> str:
@@ -48,11 +53,11 @@ class ProfilesService:
             name=name,
             profile=profile,
         )
-        await ContainersService.stop_all_by_config_tag(tag)
+        await self._containers_service.stop_all_by_config_tag(tag)
 
     async def delete(self, tag: str) -> None:
         await self._repo.delete_profile(tag)
-        await ContainersService.remove_all_by_config_tag(tag)
+        await self._containers_service.remove_all_by_config_tag(tag)
 
     async def get_all(self) -> list[ProfileSchema]:
         profiles = await self._repo.get_all_profiles()

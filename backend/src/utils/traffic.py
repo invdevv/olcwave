@@ -1,7 +1,8 @@
 import asyncio
+from typing import NoReturn
 
 from settings.service import SettingsService
-from olcrtc.sdk import OlcRTC
+from olcrtc.sdk import OlcRTCClient
 from olcrtc.service import ContainersService
 from users.service import UsersService
 
@@ -15,9 +16,13 @@ class TrafficManager:
         self,
         user_service: UsersService,
         settings_service: SettingsService,
+        olcrtc_client: OlcRTCClient,
+        containers_service: ContainersService,
     ) -> None:
         self._user_service = user_service
         self._settings_service = settings_service
+        self._olcrtc_client = olcrtc_client
+        self._containers_service = containers_service
 
     @staticmethod
     def _owner_of(name: str) -> str | None:
@@ -28,12 +33,11 @@ class TrafficManager:
 
         return None
 
-    @staticmethod
-    async def _collect_deltas() -> dict[str, int]:
+    async def _collect_deltas(self) -> dict[str, int]:
         deltas: dict[str, int] = {}
         seen: set[str] = set()
 
-        containers = await OlcRTC.all(include_stopped=False)
+        containers = await self._olcrtc_client.all(include_stopped=False)
         for cont in containers:
             info = await cont.show()
 
@@ -49,11 +53,11 @@ class TrafficManager:
 
             seen.add(name)
 
-            stats = await ContainersService.get_stats(name)
+            stats = await self._containers_service.get_stats(name)
 
             total = stats.total_bytes
 
-            previous = TrafficManager._last_totals.get(name, total)
+            previous = self._last_totals.get(name, total)
 
             # container restart resets counter
             delta = (
@@ -62,7 +66,7 @@ class TrafficManager:
                 else total
             )
 
-            TrafficManager._last_totals[name] = total
+            self._last_totals[name] = total
 
             if delta > 0:
                 deltas[owner] = (
@@ -70,15 +74,14 @@ class TrafficManager:
                 )
 
         for gone in (
-            set(TrafficManager._last_totals) - seen
+            set(self._last_totals) - seen
         ):
-            del TrafficManager._last_totals[gone]
+            del self._last_totals[gone]
 
         return deltas
 
-    @staticmethod
-    async def _stop_user_containers(short_uuid: str):
-        containers = await OlcRTC.all(include_stopped=False)
+    async def _stop_user_containers(self, short_uuid: str):
+        containers = await self._olcrtc_client.all(include_stopped=False)
 
         for cont in containers:
             info = await cont.show()
@@ -92,13 +95,13 @@ class TrafficManager:
                 continue
 
             try:
-                await OlcRTC.stop(name)
+                await self._olcrtc_client.stop(name)
 
             except Exception:
                 pass
 
     async def _tick(self):
-        deltas = await TrafficManager._collect_deltas()
+        deltas = await self._collect_deltas()
         for short_uuid, delta in deltas.items():
             try:
                 await self._user_service.add_traffic_used(short_uuid, delta)
@@ -106,13 +109,13 @@ class TrafficManager:
                 info = await self._user_service.get_traffic(short_uuid)
 
                 if info.exceeded:
-                    await TrafficManager._stop_user_containers(short_uuid)
+                    await self._stop_user_containers(short_uuid)
 
             except Exception:
                 # one broken user should not kill loop
                 continue
 
-    async def run(self):
+    async def run(self) -> NoReturn:
         while True:
             try:
                 await self._tick()

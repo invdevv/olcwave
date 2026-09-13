@@ -13,10 +13,11 @@ from routing.repository import RoutingRepository
 from profiles.service import ProfilesService
 from profiles.repository import ProfileRepository
 from olcrtc.service import ContainersService
-from traffic import TrafficManager
-from rw_sync import SyncManager
-from docker_client import docker_client
+from utils.traffic import TrafficManager
+from utils.rw_sync import SyncManager
+from utils.docker_client import docker_client
 from xraycore.sdk import XrayCoreClient
+from olcrtc.sdk import OlcRTCClient
 
 
 @lru_cache
@@ -25,8 +26,16 @@ def get_xray_core_client() -> XrayCoreClient:
 
 
 @lru_cache
+def get_olcrtc_client() -> OlcRTCClient:
+    return OlcRTCClient(docker_client)
+
+
+@lru_cache
 def get_containers_service() -> ContainersService:
-    return ContainersService(get_xray_core_client())
+    return ContainersService(
+        xray_core=get_xray_core_client(),
+        olcrtc_client=get_olcrtc_client(),
+    )
 
 
 @lru_cache
@@ -36,7 +45,10 @@ def get_settings_service() -> SettingsService:
 
 @lru_cache
 def get_profiles_service() -> ProfilesService:
-    return ProfilesService(ProfileRepository())
+    return ProfilesService(
+        repo=ProfileRepository(),
+        containers_service=get_containers_service(),
+    )
 
 
 @lru_cache
@@ -75,6 +87,7 @@ def get_subscription_service() -> SubscriptionsService:
         settings_service=get_settings_service(),
         profiles_service=get_profiles_service(),
         containers_service=get_containers_service(),
+        olcrtc_client=get_olcrtc_client(),
     )
 
 
@@ -83,6 +96,8 @@ def get_traffic_manager() -> TrafficManager:
     return TrafficManager(
         user_service=get_users_service(),
         settings_service=get_settings_service(),
+        olcrtc_client=get_olcrtc_client(),
+        containers_service=get_containers_service(),
     )
 
 
@@ -91,4 +106,5 @@ def get_routing_service() -> RoutingService:
     return RoutingService(
         repo=RoutingRepository(),
         xray_core=get_xray_core_client(),
+        constainers_service=get_containers_service(),
     )

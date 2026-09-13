@@ -11,7 +11,11 @@ from olcrtc.schemas import (
     ContainerStatsSchema,
 )
 from olcrtc.service import ContainersService
-from core.factories import get_users_service, get_xray_core_client
+from core.factories import (
+    get_users_service,
+    get_xray_core_client,
+    get_containers_service,
+)
 from users.service import UsersService
 
 
@@ -20,16 +24,18 @@ router = APIRouter(prefix="/containers", tags=["containers"])
 
 @router.get("/all")
 async def get_all(
-    _admin: dict = Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
+    containers_service: ContainersService = Depends(get_containers_service),
 ) -> list[ContainerSchema]:
-    return await ContainersService.all()
+    return await containers_service.get_all_containers()
 
 
 @router.post("/run")
 async def run(
     name: str,
     _admin: dict = Depends(get_current_admin),
-    users_service: UsersService = Depends(get_users_service)
+    users_service: UsersService = Depends(get_users_service),
+    containers_service: ContainersService = Depends(get_containers_service),
 ):
     # Block starting a container when its owner has exceeded their traffic limit.
     parts = name.split("-", 2)
@@ -44,15 +50,18 @@ async def run(
                 detail="traffic_limit_exceeded",
             )
 
-    await ContainersService.start(name)
+    await containers_service.start(name)
 
     return "ok"
 
 
 @router.post("/stop")
-async def stop(name: str, _admin: dict = Depends(get_current_admin)):
-    await ContainersService.stop(name)
-
+async def stop(
+    name: str,
+    _admin: dict = Depends(get_current_admin),
+    containers_service: ContainersService = Depends(get_containers_service),
+) -> Literal['ok']:
+    await containers_service.stop(name)
     return "ok"
 
 
@@ -61,20 +70,22 @@ async def restart(
     name: str,
     _admin: dict = Depends(get_current_admin),
     xray_core_client: XrayCoreClient = Depends(get_xray_core_client),
+    containers_service: ContainersService = Depends(get_containers_service),
 ) -> Literal['ok']:
     if await xray_core_client.is_running():
-        await ContainersService.restart(name, "host.docker.internal:10808")
+        await containers_service.restart(name, "host.docker.internal:10808")
     else:
-        await ContainersService.restart(name)
+        await containers_service.restart(name)
     return "ok"
 
 
 @router.delete("/")
 async def remove(
     name: str,
-    _admin: dict = Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
+    containers_service: ContainersService = Depends(get_containers_service),
 ) -> Literal['ok']:
-    await ContainersService.remove(name)
+    await containers_service.remove(name)
 
     return "ok"
 
@@ -82,22 +93,25 @@ async def remove(
 @router.get("/logs")
 async def logs(
     name: str,
-    _admin: dict = Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
+    containers_service: ContainersService = Depends(get_containers_service),
 ) -> ContainerLogsSchema:
-    return await ContainersService.logs(name)
+    return await containers_service.logs(name)
 
 
 @router.get("/config")
 async def get_config(
     name: str,
-    _admin: dict = Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
+    containers_service: ContainersService = Depends(get_containers_service),
 ) -> ContainerConfigSchema:
-    return await ContainersService.get_config(name)
+    return await containers_service.get_config(name)
 
 
 @router.get("/stats")
 async def get_stats(
     name: str,
-    _admin: dict = Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
+    containers_service: ContainersService = Depends(get_containers_service),
 ) -> ContainerStatsSchema:
-    return await ContainersService.get_stats(name)
+    return await containers_service.get_stats(name)

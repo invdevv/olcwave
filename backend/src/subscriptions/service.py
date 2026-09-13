@@ -8,9 +8,9 @@ import yaml
 from fastapi import Response
 
 from core.config import settings
+from olcrtc.sdk import OlcRTCClient
 from settings.service import SettingsService
 from users.schemas import TrafficInfoSchema, UserSchema
-from olcrtc.sdk import OlcRTC
 from profiles.roomGenerator import RoomChecker, RoomGenerator
 from profiles.service import ContainersService
 from profiles.service import ProfilesService
@@ -68,13 +68,15 @@ class SubscriptionsService:
         users_service: UsersService,
         settings_service: SettingsService,
         profiles_service: ProfilesService,
-        containers_service: ContainersService
+        containers_service: ContainersService,
+        olcrtc_client: OlcRTCClient,
     ) -> None:
         self._remnawave_service = remnawave_service
         self._users_service = users_service
         self._settings_service = settings_service
         self._profiles_service = profiles_service
         self._containers_service = containers_service
+        self._olcrtc_client = olcrtc_client
 
     @staticmethod
     def remove_last_emoji(s: str) -> tuple[str, str]:
@@ -159,11 +161,10 @@ class SubscriptionsService:
             f"{cfg['crypto']['key']}${name}"
         )
 
-    @staticmethod
-    async def get_launched_tags(short_uuid: str):
+    async def get_launched_tags(self, short_uuid: str):
         servers = []
 
-        for srv in await OlcRTC.all():
+        for srv in await self._olcrtc_client.all():
             if await ContainersService.is_panel_container(srv):
                 info = await srv.show()
                 name = info["Name"].lstrip("/")
@@ -212,9 +213,8 @@ class SubscriptionsService:
 
         return txt
 
-    @staticmethod
-    async def _cleanup_user_containers(short_uuid: str):
-        for container in await OlcRTC.all(True):
+    async def _cleanup_user_containers(self, short_uuid: str):
+        for container in await self._olcrtc_client.all(True):
             info = await container.show()
             name = info["Name"].lstrip("/")
 
@@ -222,7 +222,7 @@ class SubscriptionsService:
                 name.startswith("olcwave-")
                 and name.endswith(f"-{short_uuid}")
             ):
-                await OlcRTC.remove(name)
+                await self._olcrtc_client.remove(name)
 
     async def _validate_rw_user(self, short_uuid: str) -> Any | None:
         rw_user = await self._remnawave_service.get_subscription_info(short_uuid)
@@ -267,23 +267,17 @@ class SubscriptionsService:
 
     async def ensure_profiles_running(self, short_uuid: str):
 
-        running_tags = await SubscriptionsService.get_launched_tags(
-            short_uuid
-        )
+        running_tags = await self.get_launched_tags(short_uuid)
 
         async def load_config(tag):
 
-            container_name = (
-                f"olcwave-{tag}-{short_uuid}"
-            )
-
-            config = await OlcRTC.get_config(
+            container_name = f"olcwave-{tag}-{short_uuid}"
+            config = await self._olcrtc_client.get_config(
                 container_name
             )
 
             if isinstance(config, bytes):
                 config = config.decode()
-
             return tag, config
 
         loaded = await asyncio.gather(
@@ -307,7 +301,7 @@ class SubscriptionsService:
                 )
 
                 if not exists:
-                    await OlcRTC.remove(
+                    await self._olcrtc_client.remove(
                         f"olcwave-{tag}-{short_uuid}"
                     )
 
