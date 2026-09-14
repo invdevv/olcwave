@@ -40,7 +40,7 @@ class CRUDRepositoryProtocol(Protocol):
 
 class ReadRepositoryMixin(CRUDRepositoryProtocol):
     """
-    Обработка SELECT запросов
+    Handling SELECT queries
     """
 
     async def get_one(
@@ -70,7 +70,7 @@ class ReadRepositoryMixin(CRUDRepositoryProtocol):
 
 class CreateRepositoryMixin(ReadRepositoryMixin, CRUDRepositoryProtocol):
     """
-    Обработка INSERT запросов
+    Handling INSERT queries
     """
 
     async def create_one(
@@ -102,7 +102,7 @@ class CreateRepositoryMixin(ReadRepositoryMixin, CRUDRepositoryProtocol):
 
 class UpdateRepositoryMixin(ReadRepositoryMixin, CRUDRepositoryProtocol):
     """
-    Обработка UPDATE запросов
+    Handling UPDATE queries
     """
 
     async def update_one(
@@ -134,7 +134,7 @@ class UpdateRepositoryMixin(ReadRepositoryMixin, CRUDRepositoryProtocol):
 
 class DeleteRepositoryMixin(ReadRepositoryMixin, CRUDRepositoryProtocol):
     """
-    Обработка DELETE запросов
+    Handling DELETE queries
     """
 
     async def delete(

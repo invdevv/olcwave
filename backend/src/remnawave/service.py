@@ -13,8 +13,8 @@ from .schemas import (
 
 def ensure_enabled(func):
     """
-    Нужно отказаться от этой проверки, но пока оставим, 
-    чтобы не ломать существующую логику.
+    We need to get rid of this check, but for now we'll keep it
+    to avoid breaking the existing logic.
     """
     @wraps(func)
     async def wrapper(*args, **kwargs):
@@ -31,10 +31,10 @@ class RemnawaveService:
     @ensure_enabled
     async def get_all_users(self) -> GetAllUsersResponseDto:
         """
-        Получить всех пользователей из Remnawave.
-        TODO: реализовать асинхронный генератор для постраничного получения 
-        пользователей, чтобы не загружать всех сразу и не тратить память 
-        на хранение всех пользователей в списке.
+        Get all users from Remnawave.
+        TODO: implement an async generator for paginated user retrieval
+        so that users are not loaded all at once and memory is not wasted
+        on storing all users in a list
         """
         page_size = 100
         start = 0
