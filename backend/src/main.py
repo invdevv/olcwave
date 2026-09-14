@@ -3,14 +3,15 @@
 # OLCWave is free software licensed under AGPL-3.0.
 
 import asyncio
+from contextlib import asynccontextmanager
+from typing import Literal
 
+import uvicorn
 from aiodocker import DockerError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import uvicorn
-
-from routing.service import Routing
+from routing.service import RoutingService
 from settings.service import SettingsService
 from settings.router import router as settings_router
 from auth.router import router as auth_router
@@ -19,30 +20,45 @@ from users.router import router as users_router
 from subscriptions.router import router as subscriptions_router
 from olcrtc.router import router as containers_router
 from routing.router import router as routing_router
-from xraycore.sdk import XrayCore
-from config import settings
-from database import create_tables
-from traffic import TrafficManager
-from rw_sync import SyncManager
-from docker_client import init_docker, close_docker
+from utils.rw_sync import SyncManager
+from core.config import settings
+from core.factories import (
+    get_sync_manager,
+    get_settings_service,
+    get_traffic_manager,
+    get_routing_service,
+    get_xray_core_client,
+)
+from db.base import create_tables
+from utils.traffic import TrafficManager
+from utils.docker_client import docker_client
 
 
-async def lifespan(app: FastAPI):
+@asynccontextmanager
+async def lifespan(
+    app: FastAPI,
+    routing_service: RoutingService = get_routing_service(),
+    settings_service: SettingsService = get_settings_service(),
+    traffic_manager: TrafficManager = get_traffic_manager(),
+    sync_manager: SyncManager = get_sync_manager(),
+):
     await create_tables()
-    await init_docker()
-    await SettingsService.load()
+    docker = docker_client.client
+    xraycore = get_xray_core_client()
+    await settings_service.load()
 
     try:
-        routing = await Routing.get()
+        routing = await routing_service.get()
     except HTTPException:
         routing = False
+
     if routing:
-        await XrayCore.run(routing)
+        await xraycore.run(routing)
 
     if settings.RW_ENABLED:
-        SyncManager.start()
+        sync_manager.start()
 
-    traffic_task = asyncio.create_task(TrafficManager.run())
+    traffic_task = asyncio.create_task(traffic_manager.run())
 
     yield
 
@@ -53,16 +69,21 @@ async def lifespan(app: FastAPI):
         pass
 
     if settings.RW_ENABLED:
-        await SyncManager.stop()
+        await sync_manager.stop()
 
     try:
-        await XrayCore.stop()
+        await xraycore.stop()
     except DockerError:
         pass
-    await close_docker()
+    await docker.close()
 
 
-app = FastAPI(lifespan=lifespan, openapi_url="", docs_url="", redoc_url="")  # pyright: ignore[reportArgumentType]
+app = FastAPI(
+    lifespan=lifespan,
+    openapi_url="",
+    docs_url="",
+    redoc_url=""
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -82,7 +103,7 @@ app.include_router(routing_router)
 
 
 @app.get("/health")
-async def healthcheck():
+async def healthcheck() -> Literal['ok']:
     return "ok"
 
 

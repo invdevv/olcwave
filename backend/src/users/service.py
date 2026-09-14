@@ -1,51 +1,63 @@
-import asyncio
 from datetime import datetime, timezone
 
-from config import settings
+from fastapi import HTTPException, status
+
+from core.config import settings
 from settings.service import SettingsService
-from database import async_session_factory
-from users.db import UserDB
+from remnawave.service import RemnawaveService
+from users.repository import UserRepository
 from users.schemas import UserSchema, TrafficInfoSchema
 
-class Users:
-    @staticmethod
-    async def add(user: UserSchema):
-        async with async_session_factory() as db:
-            return await UserDB.add(db, user)
 
-    @staticmethod
-    async def exists(short_uuid: str) -> bool:
-        async with async_session_factory() as db:
-            return await UserDB.exists(db, short_uuid)
+class UsersService:
+    def __init__(
+        self,
+        repo: UserRepository,
+        settings_service: SettingsService,
+        remnawave_service: RemnawaveService,
+    ) -> None:
+        self._repo = repo
+        self._settings_service = settings_service
+        self._remnawave_service = remnawave_service
 
-    @staticmethod
-    async def get(short_uuid: str) -> UserSchema:
-        async with async_session_factory() as db:
-            user = await UserDB.get(db, short_uuid)
-        return user
+    async def add(self, user: UserSchema) -> UserSchema:
+        new_user = await self._repo.add_user(user.model_dump())
+        return UserSchema(**new_user)
 
-    @staticmethod
-    async def update(user: UserSchema):
-        async with async_session_factory() as db:
-            _ = await UserDB.update(db, user)
+    async def exists(self, short_uuid: str) -> bool:
+        return await self._repo.is_user_exists(short_uuid)
 
-    @staticmethod
-    async def delete(short_uuid: str):
-        async with async_session_factory() as db:
-            _ = await UserDB.delete(db, short_uuid)
+    async def get(self, short_uuid: str) -> UserSchema:
+        user = await self._repo.get_user(short_uuid)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+        return UserSchema(**user)
 
-    @staticmethod
-    async def get_all() -> list[UserSchema]:
-        async with async_session_factory() as db:
-            users: list[UserSchema] = await UserDB.get_all(db)
-        return users
+    async def update(self, user: UserSchema) -> None:
+        await self._repo.update_user(user.model_dump())
 
-    @staticmethod
-    async def get_traffic(short_uuid: str) -> TrafficInfoSchema:
-        user = await Users.get(short_uuid)
+    async def delete(self, short_uuid: str) -> None:
+        await self._repo.delete_user(short_uuid)
+
+    async def get_all(self) -> list[UserSchema]:
+        users = await self._repo.get_all_users()
+        if users is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Users not found",
+            )
+        return [UserSchema(**user) for user in users]
+
+    async def get_traffic(self, short_uuid: str) -> TrafficInfoSchema:
+        user = await self.get(short_uuid)
         unlimited = user.traffic_limit_bytes == 0
-        remaining = 0 if unlimited else max(0, user.traffic_limit_bytes - user.traffic_used_bytes)
-        exceeded = (not unlimited) and user.traffic_used_bytes >= user.traffic_limit_bytes
+        remaining = 0 if unlimited else max(
+            0, user.traffic_limit_bytes - user.traffic_used_bytes)
+        exceeded = (
+            not unlimited) and user.traffic_used_bytes >= user.traffic_limit_bytes
         return TrafficInfoSchema(
             short_uuid=short_uuid,
             limit=user.traffic_limit_bytes,
@@ -55,37 +67,28 @@ class Users:
             exceeded=exceeded,
         )
 
-    @staticmethod
-    async def set_traffic_limit(short_uuid: str, limit: int):
-        async with async_session_factory() as db:
-            await UserDB.set_traffic_limit(db, short_uuid, limit)
+    async def set_traffic_limit(self, short_uuid: str, limit: int) -> None:
+        await self._repo.set_traffic_limit(short_uuid, limit)
 
-    @staticmethod
-    async def reset_traffic(short_uuid: str):
-        async with async_session_factory() as db:
-            await UserDB.reset_traffic(db, short_uuid)
+    async def reset_traffic(self, short_uuid: str) -> None:
+        await self._repo.reset_traffic(short_uuid)
 
-    @staticmethod
-    async def add_traffic_used(short_uuid: str, delta: int):
+    async def add_traffic_used(self, short_uuid: str, delta: int) -> None:
         if delta <= 0:
             return
-        async with async_session_factory() as db:
-            await UserDB.update_traffic_used(db, short_uuid, delta)
+        await self._repo.update_traffic_used(short_uuid, delta)
 
-    @staticmethod
-    async def sync_with_remnawave():
+    async def sync_with_remnawave(self) -> dict[str, int]:
         if not settings.RW_ENABLED:
             raise RuntimeError("Remnawave is not enabled")
 
-        from rw.sdk import getAllUsers, isUserInSquad
-
-        rw_users = await getAllUsers()
-        db_users = await Users.get_all()
+        rw_users = await self._remnawave_service.get_all_users()
+        db_users = await self.get_all()
 
         rw_map = {
             u.short_uuid: u
             for u in rw_users.users
-            if isUserInSquad(u)
+            if self._remnawave_service.is_user_in_squad(u)
         }
 
         db_map = {u.short_uuid: u for u in db_users}
@@ -96,7 +99,7 @@ class Users:
 
         for short_uuid, rw_user in rw_map.items():
             if short_uuid not in db_map:
-                await Users.add(
+                await self.add(
                     UserSchema(
                         short_uuid=rw_user.short_uuid,
                         name=rw_user.username,
@@ -118,16 +121,16 @@ class Users:
                         }
                     )
 
-                    await Users.update(updated_user)
+                    await self.update(updated_user)
 
                     updated += 1
 
         for short_uuid in db_map:
             if short_uuid not in rw_map:
-                await Users.delete(short_uuid)
+                await self.delete(short_uuid)
                 deleted += 1
 
-        await SettingsService.update_last_sync(datetime.now(timezone.utc))
+        await self._settings_service.update_last_sync(datetime.now(timezone.utc))
 
         return {
             "created": created,

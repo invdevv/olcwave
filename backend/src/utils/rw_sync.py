@@ -2,9 +2,10 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone
+from typing import NoReturn
 
 from settings.service import SettingsService
-from users.service import Users
+from users.service import UsersService
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +30,28 @@ def parse_interval(value: str) -> int:
 class SyncManager:
     _task: asyncio.Task | None = None
 
-    @staticmethod
-    async def _run():
+    def __init__(
+        self,
+        users_service: UsersService,
+        settings_service: SettingsService,
+    ) -> None:
+        self._users_service = users_service
+        self._settings_service = settings_service
+
+    async def _run(self) -> NoReturn:
         while True:
             try:
-                await Users.sync_with_remnawave()
-                await SettingsService.update_last_sync(datetime.now(timezone.utc))
+                await self._users_service.sync_with_remnawave()
+                await self._settings_service.update_last_sync(
+                    dt=datetime.now(timezone.utc)
+                )
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.exception("SyncManager error")
 
             try:
-                interval_str = SettingsService.get().sync_interval
+                interval_str = self._settings_service.get().sync_interval
                 interval = parse_interval(interval_str)
             except Exception as e:
                 print(e)
@@ -49,19 +59,17 @@ class SyncManager:
 
             await asyncio.sleep(interval)
 
-    @staticmethod
-    def start():
+    def start(self) -> None:
         if SyncManager._task is not None:
             return
-        SyncManager._task = asyncio.create_task(SyncManager._run())
+        SyncManager._task = asyncio.create_task(self._run())
 
-    @staticmethod
-    async def stop():
-        if SyncManager._task is None:
+    async def stop(self) -> None:
+        if self._task is None:
             return
-        SyncManager._task.cancel()
+        self._task.cancel()
         try:
-            await SyncManager._task
+            await self._task
         except asyncio.CancelledError:
             pass
-        SyncManager._task = None
+        self._task = None

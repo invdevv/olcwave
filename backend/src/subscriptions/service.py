@@ -7,14 +7,16 @@ import yaml
 
 from fastapi import Response
 
-from config import settings
+from core.config import settings
+from olcrtc.sdk import OlcRTCClient
 from settings.service import SettingsService
 from users.schemas import TrafficInfoSchema, UserSchema
-from olcrtc.sdk import OlcRTC
 from profiles.roomGenerator import RoomChecker, RoomGenerator
-from profiles.service import Containers
-from profiles.service import Profiles
-from users.service import Users
+from profiles.service import ContainersService
+from profiles.service import ProfilesService
+from settings.service import SettingsService
+from remnawave.service import RemnawaveService
+from users.service import UsersService
 
 
 TRANSPORT_NAMES = {
@@ -59,7 +61,23 @@ def bytes_to_notation(num: float):
     return f"{int(num)}{notations[ptr]}"
 
 
-class Subscriptions:
+class SubscriptionsService:
+    def __init__(
+        self,
+        remnawave_service: RemnawaveService,
+        users_service: UsersService,
+        settings_service: SettingsService,
+        profiles_service: ProfilesService,
+        containers_service: ContainersService,
+        olcrtc_client: OlcRTCClient,
+    ) -> None:
+        self._remnawave_service = remnawave_service
+        self._users_service = users_service
+        self._settings_service = settings_service
+        self._profiles_service = profiles_service
+        self._containers_service = containers_service
+        self._olcrtc_client = olcrtc_client
+
     @staticmethod
     def remove_last_emoji(s: str) -> tuple[str, str]:
         matches = list(emoji.emoji_list(s))
@@ -133,7 +151,7 @@ class Subscriptions:
     def config_to_uri(config: str, name: str) -> str:
         cfg = yaml.safe_load(config)
 
-        options = Subscriptions.build_transport_options(cfg)
+        options = SubscriptionsService.build_transport_options(cfg)
 
         return (
             f"olcrtc://{cfg['auth']['provider']}?"
@@ -143,12 +161,11 @@ class Subscriptions:
             f"{cfg['crypto']['key']}${name}"
         )
 
-    @staticmethod
-    async def get_launched_tags(short_uuid: str):
+    async def get_launched_tags(self, short_uuid: str):
         servers = []
 
-        for srv in await OlcRTC.all():
-            if await Containers.is_panel_container(srv):
+        for srv in await self._olcrtc_client.all():
+            if await ContainersService.is_panel_container(srv):
                 info = await srv.show()
                 name = info["Name"].lstrip("/")
 
@@ -159,8 +176,8 @@ class Subscriptions:
 
         return servers
 
-    @staticmethod
     def prepare_sub_text(
+        self,
         uris: list[str],
         name: str,
         used: int = 0,
@@ -169,7 +186,7 @@ class Subscriptions:
         txt = (
             f"#name: {name}\n"
             f"#update: 2147483647\n"
-            f"#refresh: {SettingsService.get().sub_update_interval}\n"
+            f"#refresh: {self._settings_service.get().sub_update_interval}\n"
         )
         if limit == 0:
             txt += f"#used: {bytes_to_notation(used)}\n"
@@ -184,7 +201,7 @@ class Subscriptions:
         for uri in uris:
             name = uri[uri.find("$") + 1:]
 
-            name, icon = Subscriptions.remove_last_emoji(name)
+            name, icon = SubscriptionsService.remove_last_emoji(name)
 
             txt += (
                 f"{uri}\n"
@@ -196,9 +213,8 @@ class Subscriptions:
 
         return txt
 
-    @staticmethod
-    async def _cleanup_user_containers(short_uuid: str):
-        for container in await OlcRTC.all(True):
+    async def _cleanup_user_containers(self, short_uuid: str):
+        for container in await self._olcrtc_client.all(True):
             info = await container.show()
             name = info["Name"].lstrip("/")
 
@@ -206,22 +222,23 @@ class Subscriptions:
                 name.startswith("olcwave-")
                 and name.endswith(f"-{short_uuid}")
             ):
-                await OlcRTC.remove(name)
+                await self._olcrtc_client.remove(name)
 
-    @staticmethod
-    async def _validate_rw_user(short_uuid: str) -> Any | None:
-        from rw.sdk import isUserValid
-        rw_user = await isUserValid(short_uuid)
+    async def _validate_rw_user(self, short_uuid: str) -> Any | None:
+        rw_user = await self._remnawave_service.get_subscription_info(short_uuid)
         if rw_user:
             return rw_user
         return None
 
-    @staticmethod
-    async def _ensure_local_user_from_rw(short_uuid: str, rw_user: Any):
+    async def _ensure_local_user_from_rw(
+        self,
+        short_uuid: str,
+        rw_user: Any
+    ) -> None:
         try:
-            await Users.get(short_uuid)
+            await self._users_service.get(short_uuid)
         except Exception:
-            await Users.add(
+            await self._users_service.add(
                 UserSchema(
                     short_uuid=short_uuid,
                     name=rw_user.user.username,
@@ -229,8 +246,7 @@ class Subscriptions:
                 )
             )
 
-    @staticmethod
-    def traffic_limit_response(traffic: TrafficInfoSchema):
+    def traffic_limit_response(self, traffic: TrafficInfoSchema):
         traffic_uri = (
             "olcrtc://wbstream?"
             "datachannel@0#"
@@ -239,9 +255,9 @@ class Subscriptions:
         )
 
         return Response(
-            content=Subscriptions.prepare_sub_text(
+            content=self.prepare_sub_text(
                 [traffic_uri],
-                SettingsService.get().sub_name,
+                self._settings_service.get().sub_name,
                 traffic.used,
                 traffic.limit,
             ),
@@ -249,26 +265,19 @@ class Subscriptions:
             media_type="text/plain",
         )
 
-    @staticmethod
-    async def ensure_profiles_running(short_uuid: str):
+    async def ensure_profiles_running(self, short_uuid: str):
 
-        running_tags = await Subscriptions.get_launched_tags(
-            short_uuid
-        )
+        running_tags = await self.get_launched_tags(short_uuid)
 
         async def load_config(tag):
 
-            container_name = (
-                f"olcwave-{tag}-{short_uuid}"
-            )
-
-            config = await OlcRTC.get_config(
+            container_name = f"olcwave-{tag}-{short_uuid}"
+            config = await self._olcrtc_client.get_config(
                 container_name
             )
 
             if isinstance(config, bytes):
                 config = config.decode()
-
             return tag, config
 
         loaded = await asyncio.gather(
@@ -292,7 +301,7 @@ class Subscriptions:
                 )
 
                 if not exists:
-                    await OlcRTC.remove(
+                    await self._olcrtc_client.remove(
                         f"olcwave-{tag}-{short_uuid}"
                     )
 
@@ -301,7 +310,7 @@ class Subscriptions:
               for tag, cfg in configs.items())
         )
 
-        profiles_list = await Profiles.get_all()
+        profiles_list = await self._profiles_service.get_all()
 
         profiles = {
             profile.tag: profile
@@ -311,13 +320,13 @@ class Subscriptions:
         missing = profiles.keys() - configs.keys()
 
         async def start_profile(tag):
-            config = await Subscriptions.profile_to_config(
+            config = await SubscriptionsService.profile_to_config(
                 profiles[tag].profile
             )
 
             configs[tag] = config
 
-            await Containers.run(
+            await self._containers_service.run(
                 config,
                 tag,
                 short_uuid,
@@ -329,33 +338,32 @@ class Subscriptions:
 
         return configs, profiles
 
-    @staticmethod
-    async def get(short_uuid: str):
+    async def get(self, short_uuid: str):
         if settings.RW_ENABLED:
-            rw_user = await Subscriptions._validate_rw_user(short_uuid)
+            rw_user = await self._validate_rw_user(short_uuid)
             if rw_user is None:
-                await Subscriptions._cleanup_user_containers(short_uuid)
+                await self._cleanup_user_containers(short_uuid)
                 return Response(status_code=404)
 
-            await Subscriptions._ensure_local_user_from_rw(short_uuid, rw_user)
+            await self._ensure_local_user_from_rw(short_uuid, rw_user)
         else:
             try:
-                await Users.get(short_uuid)
+                await self._users_service.get(short_uuid)
             except Exception:
                 return Response(status_code=404)
 
-        traffic = await Users.get_traffic(short_uuid)
+        traffic = await self._users_service.get_traffic(short_uuid)
         if traffic.exceeded:
-            return Subscriptions.traffic_limit_response(
+            return self.traffic_limit_response(
                 traffic
             )
 
-        configs, profiles = await Subscriptions.ensure_profiles_running(
+        configs, profiles = await self.ensure_profiles_running(
             short_uuid
         )
 
         uris = [
-            Subscriptions.config_to_uri(
+            self.config_to_uri(
                 configs[tag],
                 profiles[tag].name,
             )
@@ -363,9 +371,9 @@ class Subscriptions:
         ]
 
         return Response(
-            content=Subscriptions.prepare_sub_text(
+            content=self.prepare_sub_text(
                 uris,
-                SettingsService.get().sub_name,
+                self._settings_service.get().sub_name,
                 traffic.used,
                 traffic.limit,
             ),
